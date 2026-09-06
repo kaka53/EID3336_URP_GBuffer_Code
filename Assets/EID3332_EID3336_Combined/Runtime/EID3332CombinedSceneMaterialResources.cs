@@ -9,6 +9,8 @@ using UnityEngine.Rendering;
 public sealed class EID3332CombinedSceneMaterialResources : MonoBehaviour
 {
     public Material material;
+    [Tooltip("Serialized exact VS buffer payloads for this draw. When assigned, these bytes are authoritative; Resources files remain the fallback.")]
+    public EID3336VSBufferParameters serializedVSBufferParameters;
     [Tooltip("Captured constant-buffer resource root for this draw profile.")]
     public string constantResourceRoot = "EID3336CB";
     [Tooltip("Captured vertex resource root for this draw profile.")]
@@ -58,6 +60,7 @@ public sealed class EID3332CombinedSceneMaterialResources : MonoBehaviour
     EID3332CombinedDrawProfile boundTextureProfile;
     string loadedConstantResourceRoot;
     string loadedVertexResourceRoot;
+    EID3336VSBufferParameters loadedSerializedVSBufferParameters;
 
     void OnEnable() { Reload(); }
     void OnDisable() { Release(); }
@@ -70,10 +73,11 @@ public sealed class EID3332CombinedSceneMaterialResources : MonoBehaviour
         if (material == null) return;
         loadedConstantResourceRoot = constantResourceRoot;
         loadedVertexResourceRoot = vertexResourceRoot;
+        loadedSerializedVSBufferParameters = serializedVSBufferParameters;
         foreach (var spec in ConstantSpecs)
         {
             string root = spec.vertex ? vertexResourceRoot : constantResourceRoot;
-            byte[] bytes = LoadBinaryBytes(root + "/" + spec.resource);
+            byte[] bytes = LoadSerializedOrResource(spec.name, root + "/" + spec.resource);
             if (bytes == null || bytes.Length == 0) continue;
             int size = (bytes.Length + 15) & ~15;
             uint[] words = new uint[size / 4];
@@ -83,7 +87,7 @@ public sealed class EID3332CombinedSceneMaterialResources : MonoBehaviour
             constants.Add(new ConstantBinding { name = spec.name, buffer = buffer, size = size });
         }
 
-        byte[] instanceBytes = LoadBinaryBytes(vertexResourceRoot + "/_28_30");
+        byte[] instanceBytes = LoadSerializedOrResource("VS_28_30", vertexResourceRoot + "/_28_30");
         if (instanceBytes != null && instanceBytes.Length % 256 == 0)
         {
             instanceRecords = new Raw256[instanceBytes.Length / 256];
@@ -96,7 +100,7 @@ public sealed class EID3332CombinedSceneMaterialResources : MonoBehaviour
             material.SetBuffer("VS_30_m0", instanceSsbo);
         }
 
-        byte[] vertexBytes = LoadBinaryBytes(vertexResourceRoot + "/_32");
+        byte[] vertexBytes = LoadSerializedOrResource("VS_32", vertexResourceRoot + "/_32");
         if (vertexBytes != null)
         {
             int padded = (vertexBytes.Length + 3) & ~3;
@@ -399,12 +403,23 @@ public sealed class EID3332CombinedSceneMaterialResources : MonoBehaviour
     {
         ReleaseRawResources();
         string root = "EID" + eventId + "Raw";
-        rawStream0 = CreateRawResource(root + "/vertex_stream0", "EID" + eventId + "RawStream0");
-        rawStream1 = CreateRawResource(root + "/vertex_stream1", "EID" + eventId + "RawStream1");
-        rawConstants = CreateRawResource(root + "/vertex_constant_stream", "EID" + eventId + "RawConstants");
-        rawIndices = CreateRawResource(root + "/indices_u16", "EID" + eventId + "RawIndices");
+        string serializedPrefix = eventId == 3336 ? "EID3336Raw" : null;
+        rawStream0 = CreateRawResource(root + "/vertex_stream0", "EID" + eventId + "RawStream0", serializedPrefix == null ? null : "EID3336RawStream0");
+        rawStream1 = CreateRawResource(root + "/vertex_stream1", "EID" + eventId + "RawStream1", serializedPrefix == null ? null : "EID3336RawStream1");
+        rawConstants = CreateRawResource(root + "/vertex_constant_stream", "EID" + eventId + "RawConstants", serializedPrefix == null ? null : "EID3336RawConstants");
+        rawIndices = CreateRawResource(root + "/indices_u16", "EID" + eventId + "RawIndices", serializedPrefix == null ? null : "EID3336RawIndices");
         loadedCapturedEvent = eventId;
         BindRawResources();
+    }
+
+    byte[] LoadSerializedOrResource(string serializedName, string resourcePath)
+    {
+        if (serializedVSBufferParameters != null)
+        {
+            byte[] serialized = serializedVSBufferParameters.GetBytes(serializedName);
+            if (serialized != null && serialized.Length > 0) return serialized;
+        }
+        return LoadBinaryBytes(resourcePath);
     }
 
     byte[] LoadBinaryBytes(string resourcePath)
@@ -424,9 +439,9 @@ public sealed class EID3332CombinedSceneMaterialResources : MonoBehaviour
         }        return null;
     }
 
-    ComputeBuffer CreateRawResource(string path, string name)
+    ComputeBuffer CreateRawResource(string path, string name, string serializedName = null)
     {
-        byte[] bytes = LoadBinaryBytes(path);
+        byte[] bytes = string.IsNullOrEmpty(serializedName) ? LoadBinaryBytes(path) : LoadSerializedOrResource(serializedName, path);
         if (bytes == null || bytes.Length == 0)
         {
             Debug.LogError("[EID3332Combined Resources] Missing raw asset Resources/" + path, this);
@@ -465,7 +480,7 @@ public sealed class EID3332CombinedSceneMaterialResources : MonoBehaviour
         }
     }
 
-    void Update() { if (material != null && (loadedConstantResourceRoot != constantResourceRoot || loadedVertexResourceRoot != vertexResourceRoot)) Reload(); else BindForDraw(); }
+    void Update() { if (material != null && (loadedConstantResourceRoot != constantResourceRoot || loadedVertexResourceRoot != vertexResourceRoot || loadedSerializedVSBufferParameters != serializedVSBufferParameters)) Reload(); else BindForDraw(); }
 
     void BindConstants()
     {
@@ -617,6 +632,8 @@ public sealed class EID3332CombinedSceneMaterialResources : MonoBehaviour
         if (Application.isPlaying) Destroy(value); else DestroyImmediate(value);
     }
 }
+
+
 
 
 

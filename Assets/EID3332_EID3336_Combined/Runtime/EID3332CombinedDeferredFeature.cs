@@ -16,12 +16,14 @@ public sealed class EID3332CombinedDeferredFeature : ScriptableRendererFeature
     public Settings settings = new Settings();
     SceneGBufferPass geometryPass;
     SceneDeferredPass deferredPass;
+    VSWhitePass vsWhitePass;
     static readonly HashSet<int> LoggedCameras = new HashSet<int>();
 
     public override void Create()
     {
         geometryPass = new SceneGBufferPass { renderPassEvent = settings.injectionPoint };
         deferredPass = new SceneDeferredPass { renderPassEvent = settings.previewPoint };
+        vsWhitePass = new VSWhitePass { renderPassEvent = RenderPassEvent.AfterRenderingOpaques };
     }
 
     protected override void Dispose(bool disposing)
@@ -29,20 +31,42 @@ public sealed class EID3332CombinedDeferredFeature : ScriptableRendererFeature
         deferredPass?.Release();
         geometryPass = null;
         deferredPass = null;
+        vsWhitePass = null;
     }
 
     public override void SetupRenderPasses(ScriptableRenderer renderer, in RenderingData renderingData)
     {
         Camera camera = renderingData.cameraData.camera;
+        var white = Object.FindObjectOfType<EID3336VSWhiteTest>();
+        if (white != null && white.IsForCamera(camera) && vsWhitePass != null)
+        {
+            vsWhitePass.test = white;
+            vsWhitePass.renderPassEvent = RenderPassEvent.AfterRenderingOpaques;
+        }
+
         var controller = Object.FindObjectOfType<EID3332CombinedDeferredController>();
         if (controller != null && controller.IsForCamera(camera))
             deferredPass.SetTarget(renderer.cameraColorTargetHandle);
         if (controller != null) deferredPass.SetCompositeMaterial(controller.cameraCompositeMaterial);
+        if (vsWhitePass != null)
+        {
+            var whiteForTarget = Object.FindObjectOfType<EID3336VSWhiteTest>();
+            if (whiteForTarget != null && whiteForTarget.IsForCamera(camera))
+                vsWhitePass.SetTarget(renderer.cameraColorTargetHandle);
+        }
     }
 
     public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
     {
         Camera camera = renderingData.cameraData.camera;
+        var whiteForEnqueue = Object.FindObjectOfType<EID3336VSWhiteTest>();
+        if (whiteForEnqueue != null && whiteForEnqueue.IsForCamera(camera) && vsWhitePass != null)
+        {
+            vsWhitePass.test = whiteForEnqueue;
+            vsWhitePass.renderPassEvent = RenderPassEvent.AfterRenderingOpaques;
+            renderer.EnqueuePass(vsWhitePass);
+        }
+
         var controller = Object.FindObjectOfType<EID3332CombinedDeferredController>();
         if (controller == null || !controller.IsForCamera(camera) || controller.UseEID3336FiveMRT(camera) || controller.UsesRouteBMeshForCamera(camera)) return;
 
@@ -59,6 +83,28 @@ public sealed class EID3332CombinedDeferredFeature : ScriptableRendererFeature
             deferredPass.controller = controller;
             deferredPass.renderPassEvent = settings.previewPoint;
             renderer.EnqueuePass(deferredPass);
+        }
+    }
+
+    sealed class VSWhitePass : ScriptableRenderPass
+    {
+        internal EID3336VSWhiteTest test;
+        RTHandle colorTarget;
+        internal void SetTarget(RTHandle target) { colorTarget = target; }
+        public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
+        {
+            if (colorTarget != null) ConfigureTarget(colorTarget);
+        }
+        public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
+        {
+            if (test == null || !test.IsForCamera(renderingData.cameraData.camera)) return;
+            CommandBuffer cmd = CommandBufferPool.Get("EID3336 RenderDoc VS209986 White Test");
+            try
+            {
+                test.Record(cmd);
+                context.ExecuteCommandBuffer(cmd);
+            }
+            finally { CommandBufferPool.Release(cmd); }
         }
     }
 

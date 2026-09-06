@@ -10,6 +10,7 @@ namespace UnityEngine.Rendering.Universal.Internal
     internal class GBufferPass : ScriptableRenderPass
     {
         static readonly int s_CameraNormalsTextureID = Shader.PropertyToID("_CameraNormalsTexture");
+        static readonly int s_EID3336PipelineMVPId = Shader.PropertyToID("_EID3336PipelineMVP");
         static ShaderTagId s_ShaderTagLit = new ShaderTagId("Lit");
         static ShaderTagId s_ShaderTagSimpleLit = new ShaderTagId("SimpleLit");
         static ShaderTagId s_ShaderTagUnlit = new ShaderTagId("Unlit");
@@ -149,22 +150,24 @@ namespace UnityEngine.Rendering.Universal.Internal
                 ShaderTagId lightModeTag = s_ShaderTagUniversalGBuffer;
                 m_PassData.drawingSettings = CreateDrawingSettings(lightModeTag, ref renderingData, renderingData.cameraData.defaultOpaqueSortFlags);
 
-                if (m_DeferredLights.UseEID3336FiveMRT)
+                // Bind the independent EID3336 VS resources directly from URP.
+                EID3336RenderDocPipelineShaderResources.Bind(cmd);
+
+                // Feed the active camera view-projection into the recovered VS.
+                // The VS applies the per-draw instance/object transform itself,
+                // so this is the matrix occupying the captured VS_25_m8 clip slot.
+                Camera pipelineCamera = renderingData.cameraData.camera;
+                if (pipelineCamera != null)
                 {
-                    // Flush Configure-time commands before the provider binds
-                    // its five-target framebuffer. Do not run stock
-                    // DrawRenderers: its four-target contract would overwrite
-                    // the recovered attachments and its implicit clear would
-                    // destroy the source MRT data.
-                    context.ExecuteCommandBuffer(renderingData.commandBuffer);
-                    renderingData.commandBuffer.Clear();
-                    RecordEID3336Providers(context, ref renderingData);
+                    Matrix4x4 pipelineMVP = GL.GetGPUProjectionMatrix(
+                        pipelineCamera.projectionMatrix, true) * pipelineCamera.worldToCameraMatrix;
+                    cmd.SetGlobalMatrix(s_EID3336PipelineMVPId, pipelineMVP);
                 }
-                else
-                {
-                    ExecutePass(context, m_PassData, ref renderingData);
-                    RecordEID3336Providers(context, ref renderingData);
-                }
+
+                // The material advertises UniversalGBuffer and writes the
+                // selected MRT contract. DrawRenderers is still the URP path in
+                // five-MRT mode; no provider/RendererFeature is required.
+                ExecutePass(context, m_PassData, ref renderingData);
 
                 // If any sub-system needs camera normal texture, make it available.
                 // Input attachments will only be used when this is not needed so safe to skip in that case
@@ -198,6 +201,18 @@ namespace UnityEngine.Rendering.Universal.Internal
         }
         static void ExecutePass(ScriptableRenderContext context, PassData data, ref RenderingData renderingData, bool useRenderGraph = false)
         {
+            // RenderGraph also reaches this common draw function, so the global
+            // RenderDoc buffers and active camera matrix are bound here rather
+            // than only in the legacy Execute entry point.
+            EID3336RenderDocPipelineShaderResources.Bind(renderingData.commandBuffer);
+            var pipelineCamera = renderingData.cameraData.camera;
+            if (pipelineCamera != null)
+            {
+                Matrix4x4 pipelineMVP = GL.GetGPUProjectionMatrix(
+                    pipelineCamera.projectionMatrix, true) * pipelineCamera.worldToCameraMatrix;
+                renderingData.commandBuffer.SetGlobalMatrix(s_EID3336PipelineMVPId, pipelineMVP);
+            }
+
             bool usesRenderingLayers = data.deferredLights.UseRenderingLayers && !data.deferredLights.HasRenderingLayerPrepass;
             if (usesRenderingLayers)
                 CoreUtils.SetKeyword(renderingData.commandBuffer, ShaderKeywordStrings.WriteRenderingLayers, true);
@@ -315,6 +330,7 @@ namespace UnityEngine.Rendering.Universal.Internal
         }
     }
 }
+
 
 
 

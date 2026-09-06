@@ -33,6 +33,12 @@ public static class EID3336RouteBDeferredValidationCapture
         CaptureWithMode(EID3332CombinedDeferredController.B6ViewMode.DirectLighting, "DirectLighting");
     }
 
+    [MenuItem("Tools/EID3332+3336/Capture Route B Indirect Diffuse Only")]
+    public static void CaptureIndirectDiffuse()
+    {
+        CaptureWithMode(EID3332CombinedDeferredController.B6ViewMode.IndirectDiffuse, "IndirectDiffuse");
+    }
+
     public static void CaptureMaterial()
     {
         CaptureWithMode(EID3332CombinedDeferredController.B6ViewMode.Material, "Material");
@@ -72,9 +78,29 @@ public static class EID3336RouteBDeferredValidationCapture
         controller.enableB6Lighting = true;
         controller.normalDeferredDisplay = true;
         controller.b6ViewMode = mode;
+        if (mode == EID3332CombinedDeferredController.B6ViewMode.IndirectDiffuse)
+        {
+            // Stage 1 is isolated: only the captured/fallback SH diffuse term
+            // is visible; no specular or screen-space indirect term is mixed in.
+            controller.b6IndirectDiffuseStrength = 1f;
+            controller.b6IndirectSpecularStrength = 0f;
+            controller.b6ScreenSHWeight = 0f;
+            controller.b6ScreenSpecularContributionWeight = 0f;
+            controller.b6ProbeReflectionWeight = 0f;
+            controller.b6CapturedVisibilityWeight = 0f;
+        }
         if (controller.b6MaterialOwnsTuningParameters && controller.b6LightingMaterial != null)
         {
             controller.b6LightingMaterial.SetFloat("_EID3336B6ViewMode", (float)mode);
+            if (mode == EID3332CombinedDeferredController.B6ViewMode.IndirectDiffuse)
+            {
+                controller.b6LightingMaterial.SetFloat("_EID3336B6IndirectDiffuseStrength", 1f);
+                controller.b6LightingMaterial.SetFloat("_EID3336B6IndirectSpecularStrength", 0f);
+                controller.b6LightingMaterial.SetFloat("_EID3336B6ScreenSHWeight", 0f);
+                controller.b6LightingMaterial.SetFloat("_EID3336B6ScreenSpecularContributionWeight", 0f);
+                controller.b6LightingMaterial.SetFloat("_EID3336B6ProbeReflectionWeight", 0f);
+                controller.b6LightingMaterial.SetFloat("_EID3336B6CapturedVisibilityWeight", 0f);
+            }
             EditorUtility.SetDirty(controller.b6LightingMaterial);
         }
         controller.captureURPGBufferForValidation = true;

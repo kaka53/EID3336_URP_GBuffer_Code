@@ -529,14 +529,30 @@ namespace UnityEngine.Rendering.Universal
 
         static bool QueryEID3336FiveMRT(Camera camera)
         {
-            var providers = UnityEngine.Object.FindObjectsOfType<MonoBehaviour>(true);
-            if (providers == null)
+            // GBuffer topology is selected by the material pass itself. It must
+            // not depend on a scene-side MonoBehaviour provider: those providers
+            // were removed so ordinary MeshRenderers can participate in URP's
+            // normal DrawRenderers path.
+            var renderers = UnityEngine.Object.FindObjectsOfType<Renderer>(true);
+            if (renderers == null)
                 return false;
 
-            for (int i = 0; i < providers.Length; ++i)
+            const string kShaderName = "EID3336/URP/RenderDocGBufferIndependent";
+            for (int i = 0; i < renderers.Length; ++i)
             {
-                if (providers[i] is IEID3336URPGBufferProvider provider && provider.UseEID3336FiveMRT(camera))
-                    return true;
+                var renderer = renderers[i];
+                if (renderer == null)
+                    continue;
+                if (camera != null && renderer.gameObject.scene != camera.gameObject.scene)
+                    continue;
+
+                var materials = renderer.sharedMaterials;
+                for (int j = 0; j < materials.Length; ++j)
+                {
+                    var material = materials[j];
+                    if (material != null && material.shader != null && material.shader.name == kShaderName)
+                        return true;
+                }
             }
             return false;
         }
@@ -1697,4 +1713,5 @@ namespace UnityEngine.Rendering.Universal
         }
     }
 }
+
 
