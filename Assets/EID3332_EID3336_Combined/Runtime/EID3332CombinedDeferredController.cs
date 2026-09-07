@@ -189,41 +189,22 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
     {
         Camera camera = renderingData.cameraData.camera;
         bool fiveMrt = UseEID3336FiveMRT(camera);
-        if (!isActiveAndEnabled || !fiveMrt || gbufferAttachments == null ||
-            gbufferAttachments.Length < 6 || depthAttachment == null ||
-            sharedMrtController == null)
+        if (!isActiveAndEnabled || !fiveMrt || !captureURPGBufferForValidation ||
+            gbufferAttachments == null || gbufferAttachments.Length < 6 ||
+            depthAttachment == null)
             return false;
 
-        sharedMrtController.Refresh();
-        // Only RT0..RT4 belong to the RenderDoc GBuffer draw. RT5 is
-        // the separate camera-color/lighting attachment and is intentionally
-        // not bound while the five-output shader is rasterizing geometry.
-        var colors = new RenderTargetIdentifier[5];
-        for (int i = 0; i < colors.Length; ++i)
-            colors[i] = gbufferAttachments[i].nameID;
-        CommandBuffer cmd = CommandBufferPool.Get("EID3336 URP Source GBuffer RT0-RT4");
+        // The current URP GBufferPass has already rendered the ordinary
+        // UniversalGBuffer materials. This callback is deliberately a
+        // validation-only readback bridge; it must not redraw the old custom
+        // five-MRT path on top of the current URP attachments.
+        CommandBuffer cmd = CommandBufferPool.Get("EID3336 URP GBuffer validation readback");
         try
         {
-            // URP's stock GBuffer pass is skipped in this mode. Clear only
-            // color attachments; camera depth has already been cleared by the
-            // renderer and must remain available for depth testing.
-            cmd.SetRenderTarget(colors, depthAttachment.nameID);
-            cmd.ClearRenderTarget(false, true, Color.clear, 1f);
-
-            bool captured = UseCapturedProjection(camera);
-            if (captured)
-                sharedMrtController.DrawCapturedRawMRT(cmd);
-            else
-                sharedMrtController.DrawCurrentCameraMRT(
-                    cmd,
-                    GetViewProjection(camera),
-                    useRawStreamsForCurrentCamera,
-                    useCapturedInstanceTransformsForRawCurrent);
-
-            if (captureURPGBufferForValidation)
-                CaptureURPGBufferAttachments(cmd, gbufferAttachments, 5);
+            CaptureURPGBufferAttachments(cmd, gbufferAttachments, 5);
 
             context.ExecuteCommandBuffer(cmd);
+            Debug.Log("[EID3336 URP GBuffer] validation readback copied RT0-RT4 after UniversalGBuffer DrawRenderers.");
             return true;
         }
         finally
@@ -613,7 +594,6 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
     void ReleaseB6Buffers(){reflectionProbeBuffer?.Release();clusterMaskBuffer?.Release();reflectionProbeBuffer=null;clusterMaskBuffer=null;if(runtimeB6Material!=null){if(Application.isPlaying)Destroy(runtimeB6Material);else DestroyImmediate(runtimeB6Material);runtimeB6Material=null;}}
     public void SetLiveFinalTexture(Camera camera, RenderTexture texture){if(camera!=null){if(camera.cameraType==CameraType.SceneView)liveSceneViewFinalTexture=texture;else if(camera==targetCamera)liveGameFinalTexture=texture;}}
 }
-
 
 
 

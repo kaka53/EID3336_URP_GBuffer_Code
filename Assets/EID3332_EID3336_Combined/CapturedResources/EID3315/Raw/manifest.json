@@ -1,0 +1,10 @@
+{
+  "event": 3315,
+  "vertex_count": 4766,
+  "index_count": 23853,
+  "instance_count": 1,
+  "source": "Assets/EID3315_GeometryTest/DirectPort/Resources/EID3315DirectCB",
+  "stream0_bytes": 76256,
+  "stream1_bytes": 76256,
+  "index_bytes": 47706
+}

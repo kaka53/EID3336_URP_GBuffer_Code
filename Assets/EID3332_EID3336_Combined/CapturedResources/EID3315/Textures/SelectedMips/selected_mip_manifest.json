@@ -1,0 +1,27 @@
+{
+  "271247": {
+    "name": "rid271247.tga",
+    "source": "rid271247_mip0_1024x1024.tga",
+    "guid": "bd18c1184bc7458e8ceead83d77c5131"
+  },
+  "197602": {
+    "name": "rid197602.tga",
+    "source": "rid197602_mip0_1024x1024.tga",
+    "guid": "cbda5d25bd914426bb39ef1bab144436"
+  },
+  "227514": {
+    "name": "rid227514.tga",
+    "source": "rid227514_mip1_1024x1024.tga",
+    "guid": "f96dedd0bd3d45ce8451401e695e5ab7"
+  },
+  "198541": {
+    "name": "rid198541.tga",
+    "source": "rid198541_mip1_1024x1024.tga",
+    "guid": "26bcf491e3b64e8fb0882363484f32cf"
+  },
+  "198537": {
+    "name": "rid198537.tga",
+    "source": "rid198537_mip1_1024x1024.tga",
+    "guid": "a91c76ebfb3843819d5134456ae000a5"
+  }
+}

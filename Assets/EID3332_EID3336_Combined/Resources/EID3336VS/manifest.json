@@ -1,0 +1,72 @@
+{
+  "event": 3336,
+  "vertex_count": 1716,
+  "index_count": 7980,
+  "instance_count": 3,
+  "files": [
+    {
+      "file": "_24_25.bytes",
+      "size": 1312,
+      "sha256": "cd0563cef277c8b284d7e2fb6a52d9ece2482783b0221d7f7a091970f6771604",
+      "offset": 369408,
+      "requested": 1312,
+      "rid": "526"
+    },
+    {
+      "file": "_26_27.bytes",
+      "size": 3200,
+      "sha256": "29d9f3d96bb888faff52a112bcf98451a0d88ee3732f139232ae4fefccf56f16",
+      "offset": 370944,
+      "requested": 3200,
+      "rid": "526"
+    },
+    {
+      "file": "_28_30.bytes",
+      "size": 65536,
+      "sha256": "407ec319d547ae9029337878e0a08f209d07b1782e9dcdedf01935ee8cd6255f",
+      "offset": 7495168,
+      "requested": 65536,
+      "rid": "526"
+    },
+    {
+      "file": "_32.bytes",
+      "size": 8413184,
+      "sha256": "8917ef5d197f9a039b2b77fb133aa847accb7234e800627024f1fb72c608cc4d",
+      "offset": 0,
+      "requested": 8413184,
+      "rid": "261"
+    },
+    {
+      "file": "vertex_stream0.bin",
+      "size": 27456,
+      "sha256": "6ad340d048015dc8d7f20345f1a1d7eeeb8d3cf12debce76af6f49e0947baf1f",
+      "offset": 10213136,
+      "requested": 27456,
+      "rid": "211534"
+    },
+    {
+      "file": "vertex_stream1.bin",
+      "size": 27456,
+      "sha256": "00393848d8f8efbc1e9e68b06d734b0c3386ccf9954c5527e2e657b6cc8ff1d5",
+      "offset": 10240592,
+      "requested": 27456,
+      "rid": "211534"
+    },
+    {
+      "file": "vertex_constant_stream.bin",
+      "size": 20,
+      "sha256": "d60dbf57189e6a16e14dc8e8a5ff123ff163334a32857641daeee7d46966bb76",
+      "offset": 0,
+      "requested": 20,
+      "rid": "155"
+    },
+    {
+      "file": "indices_u16.bin",
+      "size": 15960,
+      "sha256": "97d14fcb94acba26c10436120b635fb0a41e579397330df6b4f2ad1053ecbbcd",
+      "offset": 10268048,
+      "requested": 15960,
+      "rid": "211534"
+    }
+  ]
+}

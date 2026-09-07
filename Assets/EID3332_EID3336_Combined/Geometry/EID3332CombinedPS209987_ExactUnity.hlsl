@@ -236,6 +236,125 @@ cbuffer _22_24
     float4 _24_raw[4096] : packoffset(c0);
 };
 
+#ifdef EID3336_PS_USE_MATERIAL_44
+cbuffer _43_44_CAPTURE
+{
+    float _EID3336Capture44_m0 : packoffset(c0);
+    float _EID3336Capture44_m1 : packoffset(c0.y);
+    float _EID3336Capture44_m2 : packoffset(c0.z);
+    float _EID3336Capture44_m3 : packoffset(c0.w);
+    float _EID3336Capture44_m4 : packoffset(c1);
+    float _EID3336Capture44_m5 : packoffset(c1.y);
+    float _EID3336Capture44_m6 : packoffset(c1.z);
+    float _EID3336Capture44_m7 : packoffset(c1.w);
+    float _EID3336Capture44_m8 : packoffset(c2);
+    float _EID3336Capture44_m9 : packoffset(c2.y);
+    float _EID3336Capture44_m10 : packoffset(c2.z);
+    float _EID3336Capture44_m11 : packoffset(c2.w);
+    float _EID3336Capture44_m12 : packoffset(c3);
+    float _EID3336Capture44_m13 : packoffset(c3.y);
+    float _EID3336Capture44_m14 : packoffset(c3.z);
+    float _EID3336Capture44_m15 : packoffset(c3.w);
+    float _EID3336Capture44_m16 : packoffset(c4);
+    float _EID3336Capture44_m17 : packoffset(c4.y);
+    float _EID3336Capture44_m18 : packoffset(c4.z);
+    float _EID3336Capture44_m19 : packoffset(c4.w);
+    float _EID3336Capture44_m20 : packoffset(c5);
+    float _EID3336Capture44_m21 : packoffset(c5.y);
+    float _EID3336Capture44_m22 : packoffset(c5.z);
+    float _EID3336Capture44_m23 : packoffset(c5.w);
+    float _EID3336Capture44_m24 : packoffset(c6);
+    float _EID3336Capture44_m25 : packoffset(c6.y);
+    float _EID3336Capture44_m26 : packoffset(c6.z);
+    float _EID3336Capture44_m27 : packoffset(c6.w);
+    float _EID3336Capture44_m28 : packoffset(c7);
+    float _EID3336Capture44_m29 : packoffset(c7.y);
+    float _EID3336Capture44_m30 : packoffset(c7.z);
+    float _EID3336Capture44_m31 : packoffset(c7.w);
+    float4 _EID3336Capture44_m32 : packoffset(c8);
+    float4 _EID3336Capture44_m33 : packoffset(c9);
+    float4 _EID3336Capture44_m34 : packoffset(c10);
+    float4 _EID3336Capture44_m35 : packoffset(c11);
+    float4 _EID3336Capture44_m36 : packoffset(c12);
+    float4 _EID3336Capture44_m37 : packoffset(c13);
+    float4 _EID3336Capture44_m38 : packoffset(c14);
+    float4 _EID3336Capture44_m39 : packoffset(c15);
+    float4 _EID3336Capture44_m40 : packoffset(c16);
+    float4 _EID3336Capture44_m41 : packoffset(c17);
+    float4 _EID3336Capture44_m42 : packoffset(c18);
+    float4 _EID3336Capture44_m43 : packoffset(c19);
+    float4 _EID3336Capture44_m44 : packoffset(c20);
+    float4 _EID3336Capture44_m45 : packoffset(c21);
+    float _EID3336Capture44_m46 : packoffset(c22);
+    float _EID3336Capture44_m47 : packoffset(c22.y);
+    float _EID3336Capture44_m48 : packoffset(c22.z);
+    float _EID3336Capture44_m49 : packoffset(c22.w);
+    float _EID3336Capture44_m50 : packoffset(c23);
+    float _EID3336Capture44_m51 : packoffset(c23.y);
+    float _EID3336Capture44_m52 : packoffset(c23.z);
+    float _EID3336Capture44_m53 : packoffset(c23.w);
+    float4 _EID3336Capture44_m54 : packoffset(c24);
+    float4 _EID3336Capture44_m55 : packoffset(c25);
+    float _EID3336Capture44_m56 : packoffset(c26);
+    float _EID3336Capture44_m57 : packoffset(c26.y);
+    float _EID3336Capture44_m58 : packoffset(c26.z);
+    float _EID3336Capture44_m59 : packoffset(c26.w);
+    float _EID3336Capture44_m60 : packoffset(c27);
+    float _EID3336Capture44_m61 : packoffset(c27.y);
+    float _EID3336Capture44_m62 : packoffset(c27.z);
+    float _EID3336Capture44_m63 : packoffset(c27.w);
+    float _EID3336Capture44_m64 : packoffset(c28);
+    float _EID3336Capture44_m65 : packoffset(c28.y);
+    float _EID3336Capture44_m66 : packoffset(c28.z);
+    float _EID3336Capture44_m67 : packoffset(c28.w);
+    float _EID3336Capture44_m68 : packoffset(c29);
+    float _EID3336Capture44_m69 : packoffset(c29.y);
+    float _EID3336Capture44_m70 : packoffset(c29.z);
+    float _EID3336Capture44_m71 : packoffset(c29.w);
+    float4 _EID3336Capture44_m72 : packoffset(c30);
+    float4 _EID3336Capture44_m73 : packoffset(c31);
+    float _EID3336Capture44_m74 : packoffset(c32);
+    float _EID3336Capture44_m75 : packoffset(c32.y);
+    float _EID3336Capture44_m76 : packoffset(c32.z);
+    float _EID3336Capture44_m77 : packoffset(c32.w);
+    float _EID3336Capture44_m78 : packoffset(c33);
+    float _EID3336Capture44_m79 : packoffset(c33.y);
+    float _EID3336Capture44_m80 : packoffset(c33.z);
+    float _EID3336Capture44_m81 : packoffset(c33.w);
+    float _EID3336Capture44_m82 : packoffset(c34);
+    float _EID3336Capture44_m83 : packoffset(c34.y);
+    float _EID3336Capture44_m84 : packoffset(c34.z);
+    float _EID3336Capture44_m85 : packoffset(c34.w);
+    float _EID3336Capture44_m86 : packoffset(c35);
+    float _EID3336Capture44_m87 : packoffset(c35.y);
+    float _EID3336Capture44_m88 : packoffset(c35.z);
+    float _EID3336Capture44_m89 : packoffset(c35.w);
+    float _EID3336Capture44_m90 : packoffset(c36);
+    float _EID3336Capture44_m91 : packoffset(c36.y);
+    float _EID3336Capture44_m92 : packoffset(c36.z);
+    float _EID3336Capture44_m93 : packoffset(c36.w);
+    float _EID3336Capture44_m94 : packoffset(c37);
+    float _EID3336Capture44_m95 : packoffset(c37.y);
+    float _EID3336Capture44_m96 : packoffset(c37.z);
+    float _EID3336Capture44_m97 : packoffset(c37.w);
+    float4 _EID3336Capture44_m98 : packoffset(c38);
+    float4 _EID3336Capture44_m99 : packoffset(c39);
+    float4 _EID3336Capture44_m100 : packoffset(c40);
+    float4 _EID3336Capture44_m101 : packoffset(c41);
+    float _EID3336Capture44_m102 : packoffset(c42);
+    float _EID3336Capture44_m103 : packoffset(c42.y);
+    float _EID3336Capture44_m104 : packoffset(c42.z);
+    float _EID3336Capture44_m105 : packoffset(c42.w);
+    float _EID3336Capture44_m106 : packoffset(c43);
+    float _EID3336Capture44_m107 : packoffset(c43.y);
+    float _EID3336Capture44_m108 : packoffset(c43.z);
+    float _EID3336Capture44_m109 : packoffset(c43.w);
+    float _EID3336Capture44_m110 : packoffset(c44);
+    float _EID3336Capture44_m111 : packoffset(c44.y);
+    float _EID3336Capture44_m112 : packoffset(c44.z);
+    float _EID3336Capture44_m113 : packoffset(c44.w);
+};
+#else
 cbuffer _43_44
 {
     float _44_m0 : packoffset(c0);
@@ -353,6 +472,7 @@ cbuffer _43_44
     float _44_m112 : packoffset(c44.z);
     float _44_m113 : packoffset(c44.w);
 };
+#endif
 
 cbuffer _45_46
 {
@@ -409,6 +529,125 @@ cbuffer _51_52
 
 
 
+
+
+#ifdef EID3336_PS_USE_MATERIAL_44
+// Material-local PS parameter bank. The generated PS body remains unchanged.
+#define _44_m0 (lerp(_EID3336Capture44_m0, _EID3336PSLocalParam00.x, _EID3336PSUseLocalParams))
+#define _44_m1 (lerp(_EID3336Capture44_m1, _EID3336PSLocalParam00.y, _EID3336PSUseLocalParams))
+#define _44_m2 (lerp(_EID3336Capture44_m2, _EID3336PSLocalParam00.z, _EID3336PSUseLocalParams))
+#define _44_m3 (lerp(_EID3336Capture44_m3, _EID3336PSLocalParam00.w, _EID3336PSUseLocalParams))
+#define _44_m4 (lerp(_EID3336Capture44_m4, _EID3336PSLocalParam01.x, _EID3336PSUseLocalParams))
+#define _44_m5 (lerp(_EID3336Capture44_m5, _EID3336PSLocalParam01.y, _EID3336PSUseLocalParams))
+#define _44_m6 (lerp(_EID3336Capture44_m6, _EID3336PSLocalParam01.z, _EID3336PSUseLocalParams))
+#define _44_m7 (lerp(_EID3336Capture44_m7, _EID3336PSLocalParam01.w, _EID3336PSUseLocalParams))
+#define _44_m8 (lerp(_EID3336Capture44_m8, _EID3336PSLocalParam02.x, _EID3336PSUseLocalParams))
+#define _44_m9 (lerp(_EID3336Capture44_m9, _EID3336PSLocalParam02.y, _EID3336PSUseLocalParams))
+#define _44_m10 (lerp(_EID3336Capture44_m10, _EID3336PSLocalParam02.z, _EID3336PSUseLocalParams))
+#define _44_m11 (lerp(_EID3336Capture44_m11, _EID3336PSLocalParam02.w, _EID3336PSUseLocalParams))
+#define _44_m12 (lerp(_EID3336Capture44_m12, _EID3336PSLocalParam03.x, _EID3336PSUseLocalParams))
+#define _44_m13 (lerp(_EID3336Capture44_m13, _EID3336PSLocalParam03.y, _EID3336PSUseLocalParams))
+#define _44_m14 (lerp(_EID3336Capture44_m14, _EID3336PSLocalParam03.z, _EID3336PSUseLocalParams))
+#define _44_m15 (lerp(_EID3336Capture44_m15, _EID3336PSLocalParam03.w, _EID3336PSUseLocalParams))
+#define _44_m16 (lerp(_EID3336Capture44_m16, _EID3336PSLocalParam04.x, _EID3336PSUseLocalParams))
+#define _44_m17 (lerp(_EID3336Capture44_m17, _EID3336PSLocalParam04.y, _EID3336PSUseLocalParams))
+#define _44_m18 (lerp(_EID3336Capture44_m18, _EID3336PSLocalParam04.z, _EID3336PSUseLocalParams))
+#define _44_m19 (lerp(_EID3336Capture44_m19, _EID3336PSLocalParam04.w, _EID3336PSUseLocalParams))
+#define _44_m20 (lerp(_EID3336Capture44_m20, _EID3336PSLocalParam05.x, _EID3336PSUseLocalParams))
+#define _44_m21 (lerp(_EID3336Capture44_m21, _EID3336PSLocalParam05.y, _EID3336PSUseLocalParams))
+#define _44_m22 (lerp(_EID3336Capture44_m22, _EID3336PSLocalParam05.z, _EID3336PSUseLocalParams))
+#define _44_m23 (lerp(_EID3336Capture44_m23, _EID3336PSLocalParam05.w, _EID3336PSUseLocalParams))
+#define _44_m24 (lerp(_EID3336Capture44_m24, _EID3336PSLocalParam06.x, _EID3336PSUseLocalParams))
+#define _44_m25 (lerp(_EID3336Capture44_m25, _EID3336PSLocalParam06.y, _EID3336PSUseLocalParams))
+#define _44_m26 (lerp(_EID3336Capture44_m26, _EID3336PSLocalParam06.z, _EID3336PSUseLocalParams))
+#define _44_m27 (lerp(_EID3336Capture44_m27, _EID3336PSLocalParam06.w, _EID3336PSUseLocalParams))
+#define _44_m28 (lerp(_EID3336Capture44_m28, _EID3336PSLocalParam07.x, _EID3336PSUseLocalParams))
+#define _44_m29 (lerp(_EID3336Capture44_m29, _EID3336PSLocalParam07.y, _EID3336PSUseLocalParams))
+#define _44_m30 (lerp(_EID3336Capture44_m30, _EID3336PSLocalParam07.z, _EID3336PSUseLocalParams))
+#define _44_m31 (lerp(_EID3336Capture44_m31, _EID3336PSLocalParam07.w, _EID3336PSUseLocalParams))
+#define _44_m32 (lerp(_EID3336Capture44_m32, _EID3336PSLocalParam08, _EID3336PSUseLocalParams))
+#define _44_m33 (lerp(_EID3336Capture44_m33, _EID3336PSLocalParam09, _EID3336PSUseLocalParams))
+#define _44_m34 (lerp(_EID3336Capture44_m34, _EID3336PSLocalParam10, _EID3336PSUseLocalParams))
+#define _44_m35 (lerp(_EID3336Capture44_m35, _EID3336PSLocalParam11, _EID3336PSUseLocalParams))
+#define _44_m36 (lerp(_EID3336Capture44_m36, _EID3336PSLocalParam12, _EID3336PSUseLocalParams))
+#define _44_m37 (lerp(_EID3336Capture44_m37, _EID3336PSLocalParam13, _EID3336PSUseLocalParams))
+#define _44_m38 (lerp(_EID3336Capture44_m38, _EID3336PSLocalParam14, _EID3336PSUseLocalParams))
+#define _44_m39 (lerp(_EID3336Capture44_m39, _EID3336PSLocalParam15, _EID3336PSUseLocalParams))
+#define _44_m40 (lerp(_EID3336Capture44_m40, _EID3336PSLocalParam16, _EID3336PSUseLocalParams))
+#define _44_m41 (lerp(_EID3336Capture44_m41, _EID3336PSLocalParam17, _EID3336PSUseLocalParams))
+#define _44_m42 (lerp(_EID3336Capture44_m42, _EID3336PSLocalParam18, _EID3336PSUseLocalParams))
+#define _44_m43 (lerp(_EID3336Capture44_m43, _EID3336PSLocalParam19, _EID3336PSUseLocalParams))
+#define _44_m44 (lerp(_EID3336Capture44_m44, _EID3336PSLocalParam20, _EID3336PSUseLocalParams))
+#define _44_m45 (lerp(_EID3336Capture44_m45, _EID3336PSLocalParam21, _EID3336PSUseLocalParams))
+#define _44_m46 (lerp(_EID3336Capture44_m46, _EID3336PSLocalParam22.x, _EID3336PSUseLocalParams))
+#define _44_m47 (lerp(_EID3336Capture44_m47, _EID3336PSLocalParam22.y, _EID3336PSUseLocalParams))
+#define _44_m48 (lerp(_EID3336Capture44_m48, _EID3336PSLocalParam22.z, _EID3336PSUseLocalParams))
+#define _44_m49 (lerp(_EID3336Capture44_m49, _EID3336PSLocalParam22.w, _EID3336PSUseLocalParams))
+#define _44_m50 (lerp(_EID3336Capture44_m50, _EID3336PSLocalParam23.x, _EID3336PSUseLocalParams))
+#define _44_m51 (lerp(_EID3336Capture44_m51, _EID3336PSLocalParam23.y, _EID3336PSUseLocalParams))
+#define _44_m52 (lerp(_EID3336Capture44_m52, _EID3336PSLocalParam23.z, _EID3336PSUseLocalParams))
+#define _44_m53 (lerp(_EID3336Capture44_m53, _EID3336PSLocalParam23.w, _EID3336PSUseLocalParams))
+#define _44_m54 (lerp(_EID3336Capture44_m54, _EID3336PSLocalParam24, _EID3336PSUseLocalParams))
+#define _44_m55 (lerp(_EID3336Capture44_m55, _EID3336PSLocalParam25, _EID3336PSUseLocalParams))
+#define _44_m56 (lerp(_EID3336Capture44_m56, _EID3336PSLocalParam26.x, _EID3336PSUseLocalParams))
+#define _44_m57 (lerp(_EID3336Capture44_m57, _EID3336PSLocalParam26.y, _EID3336PSUseLocalParams))
+#define _44_m58 (lerp(_EID3336Capture44_m58, _EID3336PSLocalParam26.z, _EID3336PSUseLocalParams))
+#define _44_m59 (lerp(_EID3336Capture44_m59, _EID3336PSLocalParam26.w, _EID3336PSUseLocalParams))
+#define _44_m60 (lerp(_EID3336Capture44_m60, _EID3336PSLocalParam27.x, _EID3336PSUseLocalParams))
+#define _44_m61 (lerp(_EID3336Capture44_m61, _EID3336PSLocalParam27.y, _EID3336PSUseLocalParams))
+#define _44_m62 (lerp(_EID3336Capture44_m62, _EID3336PSLocalParam27.z, _EID3336PSUseLocalParams))
+#define _44_m63 (lerp(_EID3336Capture44_m63, _EID3336PSLocalParam27.w, _EID3336PSUseLocalParams))
+#define _44_m64 (lerp(_EID3336Capture44_m64, _EID3336PSLocalParam28.x, _EID3336PSUseLocalParams))
+#define _44_m65 (lerp(_EID3336Capture44_m65, _EID3336PSLocalParam28.y, _EID3336PSUseLocalParams))
+#define _44_m66 (lerp(_EID3336Capture44_m66, _EID3336PSLocalParam28.z, _EID3336PSUseLocalParams))
+#define _44_m67 (lerp(_EID3336Capture44_m67, _EID3336PSLocalParam28.w, _EID3336PSUseLocalParams))
+#define _44_m68 (lerp(_EID3336Capture44_m68, _EID3336PSLocalParam29.x, _EID3336PSUseLocalParams))
+#define _44_m69 (lerp(_EID3336Capture44_m69, _EID3336PSLocalParam29.y, _EID3336PSUseLocalParams))
+#define _44_m70 (lerp(_EID3336Capture44_m70, _EID3336PSLocalParam29.z, _EID3336PSUseLocalParams))
+#define _44_m71 (lerp(_EID3336Capture44_m71, _EID3336PSLocalParam29.w, _EID3336PSUseLocalParams))
+#define _44_m72 (lerp(_EID3336Capture44_m72, _EID3336PSLocalParam30, _EID3336PSUseLocalParams))
+#define _44_m73 (lerp(_EID3336Capture44_m73, _EID3336PSLocalParam31, _EID3336PSUseLocalParams))
+#define _44_m74 (lerp(_EID3336Capture44_m74, _EID3336PSLocalParam32.x, _EID3336PSUseLocalParams))
+#define _44_m75 (lerp(_EID3336Capture44_m75, _EID3336PSLocalParam32.y, _EID3336PSUseLocalParams))
+#define _44_m76 (lerp(_EID3336Capture44_m76, _EID3336PSLocalParam32.z, _EID3336PSUseLocalParams))
+#define _44_m77 (lerp(_EID3336Capture44_m77, _EID3336PSLocalParam32.w, _EID3336PSUseLocalParams))
+#define _44_m78 (lerp(_EID3336Capture44_m78, _EID3336PSLocalParam33.x, _EID3336PSUseLocalParams))
+#define _44_m79 (lerp(_EID3336Capture44_m79, _EID3336PSLocalParam33.y, _EID3336PSUseLocalParams))
+#define _44_m80 (lerp(_EID3336Capture44_m80, _EID3336PSLocalParam33.z, _EID3336PSUseLocalParams))
+#define _44_m81 (lerp(_EID3336Capture44_m81, _EID3336PSLocalParam33.w, _EID3336PSUseLocalParams))
+#define _44_m82 (lerp(_EID3336Capture44_m82, _EID3336PSLocalParam34.x, _EID3336PSUseLocalParams))
+#define _44_m83 (lerp(_EID3336Capture44_m83, _EID3336PSLocalParam34.y, _EID3336PSUseLocalParams))
+#define _44_m84 (lerp(_EID3336Capture44_m84, _EID3336PSLocalParam34.z, _EID3336PSUseLocalParams))
+#define _44_m85 (lerp(_EID3336Capture44_m85, _EID3336PSLocalParam34.w, _EID3336PSUseLocalParams))
+#define _44_m86 (lerp(_EID3336Capture44_m86, _EID3336PSLocalParam35.x, _EID3336PSUseLocalParams))
+#define _44_m87 (lerp(_EID3336Capture44_m87, _EID3336PSLocalParam35.y, _EID3336PSUseLocalParams))
+#define _44_m88 (lerp(_EID3336Capture44_m88, _EID3336PSLocalParam35.z, _EID3336PSUseLocalParams))
+#define _44_m89 (lerp(_EID3336Capture44_m89, _EID3336PSLocalParam35.w, _EID3336PSUseLocalParams))
+#define _44_m90 (lerp(_EID3336Capture44_m90, _EID3336PSLocalParam36.x, _EID3336PSUseLocalParams))
+#define _44_m91 (lerp(_EID3336Capture44_m91, _EID3336PSLocalParam36.y, _EID3336PSUseLocalParams))
+#define _44_m92 (lerp(_EID3336Capture44_m92, _EID3336PSLocalParam36.z, _EID3336PSUseLocalParams))
+#define _44_m93 (lerp(_EID3336Capture44_m93, _EID3336PSLocalParam36.w, _EID3336PSUseLocalParams))
+#define _44_m94 (lerp(_EID3336Capture44_m94, _EID3336PSLocalParam37.x, _EID3336PSUseLocalParams))
+#define _44_m95 (lerp(_EID3336Capture44_m95, _EID3336PSLocalParam37.y, _EID3336PSUseLocalParams))
+#define _44_m96 (lerp(_EID3336Capture44_m96, _EID3336PSLocalParam37.z, _EID3336PSUseLocalParams))
+#define _44_m97 (lerp(_EID3336Capture44_m97, _EID3336PSLocalParam37.w, _EID3336PSUseLocalParams))
+#define _44_m98 (lerp(_EID3336Capture44_m98, _EID3336PSLocalParam38, _EID3336PSUseLocalParams))
+#define _44_m99 (lerp(_EID3336Capture44_m99, _EID3336PSLocalParam39, _EID3336PSUseLocalParams))
+#define _44_m100 (lerp(_EID3336Capture44_m100, _EID3336PSLocalParam40, _EID3336PSUseLocalParams))
+#define _44_m101 (lerp(_EID3336Capture44_m101, _EID3336PSLocalParam41, _EID3336PSUseLocalParams))
+#define _44_m102 (lerp(_EID3336Capture44_m102, _EID3336PSLocalParam42.x, _EID3336PSUseLocalParams))
+#define _44_m103 (lerp(_EID3336Capture44_m103, _EID3336PSLocalParam42.y, _EID3336PSUseLocalParams))
+#define _44_m104 (lerp(_EID3336Capture44_m104, _EID3336PSLocalParam42.z, _EID3336PSUseLocalParams))
+#define _44_m105 (lerp(_EID3336Capture44_m105, _EID3336PSLocalParam42.w, _EID3336PSUseLocalParams))
+#define _44_m106 (lerp(_EID3336Capture44_m106, _EID3336PSLocalParam43.x, _EID3336PSUseLocalParams))
+#define _44_m107 (lerp(_EID3336Capture44_m107, _EID3336PSLocalParam43.y, _EID3336PSUseLocalParams))
+#define _44_m108 (lerp(_EID3336Capture44_m108, _EID3336PSLocalParam43.z, _EID3336PSUseLocalParams))
+#define _44_m109 (lerp(_EID3336Capture44_m109, _EID3336PSLocalParam43.w, _EID3336PSUseLocalParams))
+#define _44_m110 (lerp(_EID3336Capture44_m110, _EID3336PSLocalParam44.x, _EID3336PSUseLocalParams))
+#define _44_m111 (lerp(_EID3336Capture44_m111, _EID3336PSLocalParam44.y, _EID3336PSUseLocalParams))
+#define _44_m112 (lerp(_EID3336Capture44_m112, _EID3336PSLocalParam44.z, _EID3336PSUseLocalParams))
+#define _44_m113 (lerp(_EID3336Capture44_m113, _EID3336PSLocalParam44.w, _EID3336PSUseLocalParams))
+#endif
 
 Texture2D<float4> _33;
 

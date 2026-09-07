@@ -1,0 +1,32 @@
+{
+  "event": 3332,
+  "vertex_count": 829,
+  "index_count": 4791,
+  "instance_count": 1,
+  "files": [
+    {
+      "file": "vertex_stream0.bytes",
+      "size": 13264,
+      "offset": 10135664,
+      "sha256": "9b30dd18bc2e4aa8760c6fedb0cc81439ee2e9dd714e2272afc857782a141201"
+    },
+    {
+      "file": "vertex_stream1.bytes",
+      "size": 13264,
+      "offset": 10148976,
+      "sha256": "c1ca483a85c81524eba09e8d37e06b7334e8d83ed12c368ec6b88e9b539cef41"
+    },
+    {
+      "file": "vertex_constant_stream.bytes",
+      "size": 20,
+      "offset": 0,
+      "sha256": "d60dbf57189e6a16e14dc8e8a5ff123ff163334a32857641daeee7d46966bb76"
+    },
+    {
+      "file": "indices_u16.bytes",
+      "size": 9582,
+      "offset": 10162288,
+      "sha256": "e950f5e6e549e93b84e977ca101e7f23e3d8417d1b504e10aac5687b5c43b4cf"
+    }
+  ]
+}

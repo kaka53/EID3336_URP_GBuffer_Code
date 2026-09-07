@@ -201,11 +201,15 @@ int _EID3336InstanceIndex;
 // overridden per renderer through a MaterialPropertyBlock.
 float _EID3336RouteBUseObjectTransform;
 float4x4 _EID3336RouteBObjectToWorld;
+static float EID3336IndependentUseObjectTransform;
+static float4x4 EID3336IndependentObjectToWorld;
 VS_29 EID3336RouteBGetInstanceRecord()
 {
     VS_29 record = VS_30_m0[uint(_EID3336InstanceIndex)];
     if (_EID3336RouteBUseObjectTransform > 0.5f)
         record._m0 = _EID3336RouteBObjectToWorld;
+    if (EID3336IndependentUseObjectTransform > 0.5f)
+        record._m0 = EID3336IndependentObjectToWorld;
     return record;
 }
 
@@ -497,6 +501,18 @@ EID3336_VS_Output EID3336ExactVSProcedural(uint vertexId : SV_VertexID)
 
 EID3336_VS_Output EID3336ExactVS(EID3336_VS_Input stage_input)
 {
+    return EID3336ExactVSCore(stage_input);
+}
+
+// Independent URP adapter variant: keep the recovered VS body and captured
+// per-instance material fields, but replace only the object transform with the
+// current MeshRenderer's Unity localToWorld matrix. This is the transform that
+// makes RenderDoc geometry follow the selected scene model.
+
+EID3336_VS_Output EID3336ExactVSWithObjectTransform(EID3336_VS_Input stage_input, float4x4 objectToWorld)
+{
+    EID3336IndependentUseObjectTransform = 1.0f;
+    EID3336IndependentObjectToWorld = objectToWorld;
     return EID3336ExactVSCore(stage_input);
 }
 
