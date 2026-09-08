@@ -61,7 +61,7 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
     public Texture2D b6ReflectionVisibility;
     public Texture2D b6SSAO;
     public Texture2DArray b6ReflectionAtlas;
-    [Range(0f, 1f)] public float b6ScreenSHWeight = 1f;
+    [Range(0f, 1f)] public float b6ScreenSHWeight = 0f; // 0=保留screen_sh_b5，1=移除screen_sh_b5
     [Range(0f, 1f)] public float b6ScreenSpecularContributionWeight = 1f;
     [Range(0f, 1f)] public float b6ProbeReflectionWeight = 1f;
     [Range(0f, 1f)] public float b6CapturedVisibilityWeight = 1f;
@@ -92,6 +92,7 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
     [NonSerialized] public Renderer[] renderers = Array.Empty<Renderer>();
     readonly Dictionary<Renderer, int> profileByRenderer = new Dictionary<Renderer, int>();
     readonly Dictionary<Renderer, int> rendererIndex = new Dictionary<Renderer, int>();
+    readonly Dictionary<int, Material> runtimeB6Materials = new Dictionary<int, Material>();
     ComputeBuffer reflectionProbeBuffer;
     ComputeBuffer clusterMaskBuffer;
     Material runtimeB6Material;
@@ -99,9 +100,9 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
     const string CapturedRoot = "Assets/EID3336_URP_Reconstruction/DeferredLightingReadable/CapturedResources";
     string ProjectFile(string assetPath) => Path.Combine(Directory.GetParent(Application.dataPath).FullName, assetPath.Replace('/', Path.DirectorySeparatorChar));
 
-    void OnEnable() { RefreshRenderers(); LoadB6Assets(); LoadCapturedMatrices(); }
-    void OnDisable() { ReleaseB6Buffers(); }
-    void OnDestroy() { ReleaseB6Buffers(); }
+    void OnEnable() { RefreshRenderers(); LoadB6Assets(); LoadCapturedMatrices(); EID3336LightingParameters.Register(this); }
+    void OnDisable() { EID3336LightingParameters.Unregister(this); ReleaseB6Buffers(); }
+    void OnDestroy() { EID3336LightingParameters.Unregister(this); ReleaseB6Buffers(); }
     void OnValidate() { if (isActiveAndEnabled) RefreshRenderers(); }
 
     public bool UsesRouteBMeshForCamera(Camera camera)
@@ -148,9 +149,75 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
     }
     public Material GetActiveDeferredLightingMaterial()
     {
+        return GetActiveDeferredLightingMaterial(targetCamera);
+    }
+
+    public Material GetActiveDeferredLightingMaterial(Camera camera)
+    {
         if (!enableB6Lighting) return null;
         EnsureB6Material();
-        return b6LightingMaterial;
+        if (b6LightingMaterial == null || b6LightingMaterial.shader == null) return null;
+
+        // The serialized material is the tuning source only. RTs, depth, matrices
+        // and camera-dependent buffers belong to a per-camera runtime instance.
+        int key = camera != null ? camera.GetInstanceID() : 0;
+        if (!runtimeB6Materials.TryGetValue(key, out Material material) || material == null ||
+            material.shader != b6LightingMaterial.shader)
+        {
+            DestroyRuntimeB6Material(material);
+            material = new Material(b6LightingMaterial)
+            {
+                name = "EID3332Combined B6 Runtime [" + (camera != null ? camera.name : "default") + "]",
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            runtimeB6Materials[key] = material;
+        }
+        else
+        {
+            // Pick up only inspector tuning changes. CopyPropertiesFromMaterial
+            // is intentionally avoided here because it also copies the previous
+            // camera's live RTs, depth, matrices and structured buffers.
+            SyncB6TuningProperties(b6LightingMaterial, material);
+        }
+        return material;
+    }
+
+    static void SyncB6TuningProperties(Material source, Material target)
+    {
+        if (source == null || target == null) return;
+
+        string[] floatProperties =
+        {
+            "_EID3336B6ViewMode",
+            "_EID3336B6ScreenSHWeight",
+            "_EID3336B6ScreenSpecularContributionWeight",
+            "_EID3336B6ProbeReflectionWeight",
+            "_EID3336B6CapturedVisibilityWeight",
+            "_EID3336B6WorldDisplayRange",
+            "_EID3336B6DepthDisplayFar",
+            "_EID3336B6ReconstructionFlipY",
+            "_EID3336B6FlipY",
+            "_EID3336B6LightIntensity",
+            "_EID3336B6AmbientStrength",
+            "_EID3336B6DiffuseStrength",
+            "_EID3336B6SpecularStrength",
+            "_EID3336B6IndirectDiffuseStrength",
+            "_EID3336B6IndirectSpecularStrength"
+        };
+        foreach (string property in floatProperties)
+            if (source.HasProperty(property) && target.HasProperty(property))
+                target.SetFloat(property, source.GetFloat(property));
+
+        if (source.HasProperty("_EID3336B6LightDirectionWS") && target.HasProperty("_EID3336B6LightDirectionWS"))
+            target.SetVector("_EID3336B6LightDirectionWS", source.GetVector("_EID3336B6LightDirectionWS"));
+        if (source.HasProperty("_EID3336B6LightColor") && target.HasProperty("_EID3336B6LightColor"))
+            target.SetColor("_EID3336B6LightColor", source.GetColor("_EID3336B6LightColor"));
+    }
+
+    void DestroyRuntimeB6Material(Material material)
+    {
+        if (material == null) return;
+        if (Application.isPlaying) Destroy(material); else DestroyImmediate(material);
     }
     void EnsureB6Material()
     {
@@ -344,67 +411,30 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
         BindDeferredLighting(camera, outputWidth, outputHeight);
     }
 
-    public bool RecordEID3336DeferredLighting(
-        ScriptableRenderContext context,
-        ref RenderingData renderingData,
-        RTHandle[] gbufferAttachments,
-        RTHandle lightingAttachment,
-        RTHandle depthAttachment,
-        RTHandle depthCopyTexture,
-        bool sourceFiveMrt)
+    public bool TryPrepareEID3336Lighting(Camera camera, out Material material)
     {
-        Camera camera = renderingData.cameraData.camera;
-        if (!IsForCamera(camera) || (!sourceFiveMrt && !UsesRouteBMeshForCamera(camera)) || !enableB6Lighting ||
-            gbufferAttachments == null || gbufferAttachments.Length < (sourceFiveMrt ? 5 : 3) ||
-            lightingAttachment == null || depthAttachment == null)
-            return false;
-
-        // Never substitute black textures for missing required live GBuffer inputs.
-        for (int i = 0; i < (sourceFiveMrt ? 5 : 3); ++i)
-            if (gbufferAttachments[i] == null || gbufferAttachments[i].rt == null)
-                return false;
-
-        EnsureB6Material();
-        if (b6LightingMaterial == null || b6LightingMaterial.shader == null ||
-            !b6LightingMaterial.shader.isSupported)
-            return false;
-
-        int width = Mathf.Max(1, renderingData.cameraData.cameraTargetDescriptor.width);
-        int height = Mathf.Max(1, renderingData.cameraData.cameraTargetDescriptor.height);
-        BindDeferredLightingFromURPGBuffer(camera, gbufferAttachments, depthAttachment, depthCopyTexture, width, height, sourceFiveMrt);
-
-        CommandBuffer cmd = CommandBufferPool.Get("EID3336 Route B URP Deferred Lighting");
-        try
-        {
-            // Lighting is a persistent URP attachment. Explicitly clear its color
-            // before the full-screen B6 draw so pixels not written by an invalid
-            // depth/GBuffer sample cannot retain the previous frame's lighting.
-            cmd.SetRenderTarget(lightingAttachment.nameID, depthAttachment.nameID);
-            cmd.ClearRenderTarget(false, false, Color.clear);
-            cmd.DrawProcedural(Matrix4x4.identity, b6LightingMaterial, 0,
-                MeshTopology.Triangles, 3, 1);
-            context.ExecuteCommandBuffer(cmd);
-            LogDeferredInputContract(camera, sourceFiveMrt);
-            return true;
-        }
-        finally
-        {
-            CommandBufferPool.Release(cmd);
-        }
+        material = null;
+        if (!IsForCamera(camera) || !enableB6Lighting) return false;
+        material = GetActiveDeferredLightingMaterial(camera);
+        if (material == null) return false;
+        BindCapturedLightingInputsToMaterial(material);
+        if (!b6MaterialOwnsTuningParameters) ApplyControllerB6TuningToMaterial(material);
+        return true;
     }
 
     // Log once per camera/layout, not every repaint (SceneView renders continuously).
     readonly System.Collections.Generic.Dictionary<int, string> deferredInputContracts =
         new System.Collections.Generic.Dictionary<int, string>();
 
-    void LogDeferredInputContract(Camera camera, bool sourceFiveMrt)
+    void LogDeferredInputContract(Camera camera, bool sourceFiveMrt, Material material)
     {
+        if (camera == null || material == null) return;
         string contract = "fiveMrt=" + sourceFiveMrt +
-            " Material=" + b6LightingMaterial.GetFloat("_EID3336B6MaterialTarget") +
-            " Normal=" + b6LightingMaterial.GetFloat("_EID3336B6NormalTarget") +
-            " BaseColor=" + b6LightingMaterial.GetFloat("_EID3336B6BaseColorTarget") +
-            " RT3=" + b6LightingMaterial.GetTexture("_EID3336B6RT3")?.name +
-            " RT4=" + b6LightingMaterial.GetTexture("_EID3336B6RT4")?.name;
+            " Material=" + material.GetFloat("_EID3336B6MaterialTarget") +
+            " Normal=" + material.GetFloat("_EID3336B6NormalTarget") +
+            " BaseColor=" + material.GetFloat("_EID3336B6BaseColorTarget") +
+            " RT3=" + material.GetTexture("_EID3336B6RT3")?.name +
+            " RT4=" + material.GetTexture("_EID3336B6RT4")?.name;
         int id = camera.GetInstanceID();
         if (deferredInputContracts.TryGetValue(id, out string previous) && previous == contract)
             return;
@@ -419,9 +449,10 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
         RTHandle depthCopyTexture,
         int outputWidth,
         int outputHeight,
-        bool sourceFiveMrt)
+        bool sourceFiveMrt,
+        Material material)
     {
-        if (b6LightingMaterial == null || camera == null || gbufferAttachments == null ||
+        if (material == null || camera == null || gbufferAttachments == null ||
             gbufferAttachments.Length < 3 || depthAttachment == null)
             return;
 
@@ -432,19 +463,19 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
         // also rebound here every frame. Scalar tuning values (weights, view mode,
         // direct-light controls) remain material-owned when b6MaterialOwnsTuningParameters
         // is enabled.
-        BindCapturedLightingInputsToMaterial();
-        b6LightingMaterial.SetTexture("_EID3336B6RT0", gbufferAttachments[0].rt);
-        b6LightingMaterial.SetTexture("_EID3336B6RT1", gbufferAttachments[1].rt);
-        b6LightingMaterial.SetTexture("_EID3336B6RT2", gbufferAttachments[2].rt);
+        BindCapturedLightingInputsToMaterial(material);
+        material.SetTexture("_EID3336B6RT0", gbufferAttachments[0].rt);
+        material.SetTexture("_EID3336B6RT1", gbufferAttachments[1].rt);
+        material.SetTexture("_EID3336B6RT2", gbufferAttachments[2].rt);
         if (sourceFiveMrt)
         {
-            b6LightingMaterial.SetTexture("_EID3336B6RT3", gbufferAttachments[3].rt);
-            b6LightingMaterial.SetTexture("_EID3336B6RT4", gbufferAttachments[4].rt);
+            material.SetTexture("_EID3336B6RT3", gbufferAttachments[3].rt);
+            material.SetTexture("_EID3336B6RT4", gbufferAttachments[4].rt);
         }
         else
         {
-            b6LightingMaterial.SetTexture("_EID3336B6RT3", Texture2D.blackTexture);
-            b6LightingMaterial.SetTexture("_EID3336B6RT4", Texture2D.blackTexture);
+            material.SetTexture("_EID3336B6RT3", Texture2D.blackTexture);
+            material.SetTexture("_EID3336B6RT4", Texture2D.blackTexture);
         }
         // The source-level B6 shader expects the same sampled depth image as the
         // copy-depth stage. The native depth-stencil attachment is not a
@@ -452,82 +483,83 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
         RenderTexture depthSource = depthCopyTexture != null ? depthCopyTexture.rt : null;
         if (depthSource == null && depthAttachment != null)
             depthSource = depthAttachment.rt;
-        b6LightingMaterial.SetTexture("_EID3336B6Depth", depthSource);
+        material.SetTexture("_EID3336B6Depth", depthSource);
 
         Matrix4x4 vp = GetViewProjection(camera);
-        b6LightingMaterial.SetMatrix("_EID3336B6ClipToWorld", vp.inverse);
-        b6LightingMaterial.SetMatrix("_EID3336B6WorldToView", GetWorldToView(camera));
-        b6LightingMaterial.SetVector("_EID3336B6CameraPositionWS", GetCameraPosition(camera));
+        material.SetMatrix("_EID3336B6ClipToWorld", vp.inverse);
+        material.SetMatrix("_EID3336B6WorldToView", GetWorldToView(camera));
+        material.SetVector("_EID3336B6CameraPositionWS", GetCameraPosition(camera));
         outputWidth = Mathf.Max(1, outputWidth);
         outputHeight = Mathf.Max(1, outputHeight);
-        b6LightingMaterial.SetVector("_EID3336B6ScreenSize", new Vector4(outputWidth, outputHeight, 1f / outputWidth, 1f / outputHeight));
-        b6LightingMaterial.SetVector("_EID3336B6OutputSize", new Vector4(outputWidth, outputHeight, 1f / outputWidth, 1f / outputHeight));
+        material.SetVector("_EID3336B6ScreenSize", new Vector4(outputWidth, outputHeight, 1f / outputWidth, 1f / outputHeight));
+        material.SetVector("_EID3336B6OutputSize", new Vector4(outputWidth, outputHeight, 1f / outputWidth, 1f / outputHeight));
 
         // The source five-MRT contract is a runtime routing decision, not a
         // material default. Always set the decoder targets here so a material
         // serialized for the legacy URP contract cannot silently remap RTs.
         if (!b6MaterialOwnsTuningParameters)
-            ApplyControllerB6TuningToMaterial();
-        b6LightingMaterial.SetFloat("_EID3336B6UseURPGBuffer", sourceFiveMrt ? 0f : 1f);
-        b6LightingMaterial.SetFloat("_EID3336B6MaterialTarget", sourceFiveMrt ? 2f : 1f);
-        b6LightingMaterial.SetFloat("_EID3336B6NormalTarget", sourceFiveMrt ? 3f : 2f);
-        b6LightingMaterial.SetFloat("_EID3336B6BaseColorTarget", sourceFiveMrt ? 4f : 0f);
-        EnsureProbeBuffers();
+            ApplyControllerB6TuningToMaterial(material);
+        material.SetFloat("_EID3336B6UseURPGBuffer", sourceFiveMrt ? 0f : 1f);
+        material.SetFloat("_EID3336B6MaterialTarget", sourceFiveMrt ? 2f : 1f);
+        material.SetFloat("_EID3336B6NormalTarget", sourceFiveMrt ? 3f : 2f);
+        material.SetFloat("_EID3336B6BaseColorTarget", sourceFiveMrt ? 4f : 0f);
+        EnsureProbeBuffers(material);
     }
 
     public void BindDeferredLighting(Camera camera, int outputWidth, int outputHeight)
     {
-        if (b6LightingMaterial == null || targets == null || camera == null) return;
+        Material material = GetActiveDeferredLightingMaterial(camera);
+        if (material == null || targets == null || camera == null) return;
 
         // Legacy five-MRT resources are also pipeline-owned/live.
-        BindCapturedLightingInputsToMaterial();
+        BindCapturedLightingInputsToMaterial(material);
         for (int i = 0; i < 5; ++i)
-            b6LightingMaterial.SetTexture("_EID3336B6RT" + i, targets.GetColor(i));
-        b6LightingMaterial.SetTexture("_EID3336B6Depth", targets.Depth);
+            material.SetTexture("_EID3336B6RT" + i, targets.GetColor(i));
+        material.SetTexture("_EID3336B6Depth", targets.Depth);
 
         Matrix4x4 vp = GetViewProjection(camera);
-        b6LightingMaterial.SetMatrix("_EID3336B6ClipToWorld", vp.inverse);
-        b6LightingMaterial.SetMatrix("_EID3336B6WorldToView", GetWorldToView(camera));
-        b6LightingMaterial.SetVector("_EID3336B6CameraPositionWS", GetCameraPosition(camera));
+        material.SetMatrix("_EID3336B6ClipToWorld", vp.inverse);
+        material.SetMatrix("_EID3336B6WorldToView", GetWorldToView(camera));
+        material.SetVector("_EID3336B6CameraPositionWS", GetCameraPosition(camera));
         outputWidth = Mathf.Max(1, outputWidth);
         outputHeight = Mathf.Max(1, outputHeight);
         int gbufferWidth = Mathf.Max(1, targets.width);
         int gbufferHeight = Mathf.Max(1, targets.height);
-        b6LightingMaterial.SetVector("_EID3336B6ScreenSize", new Vector4(gbufferWidth, gbufferHeight, 1f / gbufferWidth, 1f / gbufferHeight));
-        b6LightingMaterial.SetVector("_EID3336B6OutputSize", new Vector4(outputWidth, outputHeight, 1f / outputWidth, 1f / outputHeight));
+        material.SetVector("_EID3336B6ScreenSize", new Vector4(gbufferWidth, gbufferHeight, 1f / gbufferWidth, 1f / gbufferHeight));
+        material.SetVector("_EID3336B6OutputSize", new Vector4(outputWidth, outputHeight, 1f / outputWidth, 1f / outputHeight));
 
         if (!b6MaterialOwnsTuningParameters)
         {
-            ApplyControllerB6TuningToMaterial();
-            b6LightingMaterial.SetFloat("_EID3336B6UseURPGBuffer", 0f);
-            b6LightingMaterial.SetFloat("_EID3336B6MaterialTarget", 2f);
-            b6LightingMaterial.SetFloat("_EID3336B6NormalTarget", 3f);
-            b6LightingMaterial.SetFloat("_EID3336B6BaseColorTarget", 4f);
+            ApplyControllerB6TuningToMaterial(material);
+            material.SetFloat("_EID3336B6UseURPGBuffer", 0f);
+            material.SetFloat("_EID3336B6MaterialTarget", 2f);
+            material.SetFloat("_EID3336B6NormalTarget", 3f);
+            material.SetFloat("_EID3336B6BaseColorTarget", 4f);
         }
-        EnsureProbeBuffers();
+        EnsureProbeBuffers(material);
     }
 
     // Captured textures and the RenderDoc constant/structured-buffer inputs are
     // pipeline data, not per-object material tuning. Keep them synchronized with
     // the active B6 material on every camera render so the full indirect-lighting
     // path cannot silently fall back to black/default resources.
-    void BindCapturedLightingInputsToMaterial()
+    void BindCapturedLightingInputsToMaterial(Material material)
     {
-        if (b6LightingMaterial == null) return;
+        if (material == null) return;
         LoadB6Assets();
-        if (b6ScreenSH != null) b6LightingMaterial.SetTexture("_EID3336B6ScreenSH", b6ScreenSH);
-        if (b6ScreenSpecularColor != null) b6LightingMaterial.SetTexture("_EID3336B6ScreenSpecularColor", b6ScreenSpecularColor);
-        if (b6ScreenSpecularWeight != null) b6LightingMaterial.SetTexture("_EID3336B6ScreenSpecularWeight", b6ScreenSpecularWeight);
-        if (b6ReflectionValidity != null) b6LightingMaterial.SetTexture("_EID3336B6ReflectionValidity", b6ReflectionValidity);
-        if (b6ReflectionVisibility != null) b6LightingMaterial.SetTexture("_EID3336B6ReflectionVisibility", b6ReflectionVisibility);
-        if (b6SSAO != null) b6LightingMaterial.SetTexture("_EID3336B6SSAO", b6SSAO);
-        if (b6ReflectionAtlas != null) b6LightingMaterial.SetTexture("_EID3336B6ReflectionAtlas", b6ReflectionAtlas);
+        if (b6ScreenSH != null) material.SetTexture("_EID3336B6ScreenSH", b6ScreenSH);
+        if (b6ScreenSpecularColor != null) material.SetTexture("_EID3336B6ScreenSpecularColor", b6ScreenSpecularColor);
+        if (b6ScreenSpecularWeight != null) material.SetTexture("_EID3336B6ScreenSpecularWeight", b6ScreenSpecularWeight);
+        if (b6ReflectionValidity != null) material.SetTexture("_EID3336B6ReflectionValidity", b6ReflectionValidity);
+        if (b6ReflectionVisibility != null) material.SetTexture("_EID3336B6ReflectionVisibility", b6ReflectionVisibility);
+        if (b6SSAO != null) material.SetTexture("_EID3336B6SSAO", b6SSAO);
+        if (b6ReflectionAtlas != null) material.SetTexture("_EID3336B6ReflectionAtlas", b6ReflectionAtlas);
 
         // These values come from the captured deferred-lighting constant buffers.
         // They are not replaced by Unity's standard URP lighting constants.
-        SetB6Constants();
-        ApplyProbeConstantsToMaterial();
-        EnsureProbeBuffers();
+        SetB6Constants(material);
+        ApplyProbeConstantsToMaterial(material);
+        EnsureProbeBuffers(material);
     }
 
     [ContextMenu("Copy Controller B6 Values To Material")]
@@ -535,39 +567,47 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
     {
         EnsureB6Material();
         if (b6LightingMaterial == null) return;
-        LoadB6Assets();
-
-        b6LightingMaterial.SetTexture("_EID3336B6ScreenSH", b6ScreenSH);
-        b6LightingMaterial.SetTexture("_EID3336B6ScreenSpecularColor", b6ScreenSpecularColor);
-        b6LightingMaterial.SetTexture("_EID3336B6ScreenSpecularWeight", b6ScreenSpecularWeight);
-        b6LightingMaterial.SetTexture("_EID3336B6ReflectionValidity", b6ReflectionValidity);
-        b6LightingMaterial.SetTexture("_EID3336B6ReflectionVisibility", b6ReflectionVisibility);
-        b6LightingMaterial.SetTexture("_EID3336B6SSAO", b6SSAO);
-        b6LightingMaterial.SetTexture("_EID3336B6ReflectionAtlas", b6ReflectionAtlas);
-        b6LightingMaterial.SetFloat("_EID3336B6ViewMode", (float)b6ViewMode);
-        b6LightingMaterial.SetFloat("_EID3336B6ScreenSHWeight", b6ScreenSHWeight);
-        b6LightingMaterial.SetFloat("_EID3336B6ScreenSpecularContributionWeight", b6ScreenSpecularContributionWeight);
-        b6LightingMaterial.SetFloat("_EID3336B6ProbeReflectionWeight", b6ProbeReflectionWeight);
-        b6LightingMaterial.SetFloat("_EID3336B6CapturedVisibilityWeight", b6CapturedVisibilityWeight);
-        b6LightingMaterial.SetFloat("_EID3336B6WorldDisplayRange", worldPositionRange);
-        b6LightingMaterial.SetFloat("_EID3336B6DepthDisplayFar", depthDisplayFar);
-        b6LightingMaterial.SetFloat("_EID3336B6ReconstructionFlipY", reconstructionFlipY ? 1f : 0f);
-        b6LightingMaterial.SetFloat("_EID3336B6FlipY", b6FlipY ? 1f : 0f);
-        Vector3 d = lightDirectionWS.sqrMagnitude > 1e-6f ? lightDirectionWS.normalized : Vector3.up;
-        b6LightingMaterial.SetVector("_EID3336B6LightDirectionWS", new Vector4(d.x, d.y, d.z, 0f));
-        b6LightingMaterial.SetColor("_EID3336B6LightColor", lightColor);
-        b6LightingMaterial.SetFloat("_EID3336B6LightIntensity", lightIntensity);
-        b6LightingMaterial.SetFloat("_EID3336B6AmbientStrength", ambientStrength);
-        b6LightingMaterial.SetFloat("_EID3336B6DiffuseStrength", 1f);
-        b6LightingMaterial.SetFloat("_EID3336B6SpecularStrength", specularStrength);
-        b6LightingMaterial.SetFloat("_EID3336B6IndirectDiffuseStrength", b6IndirectDiffuseStrength);
-        b6LightingMaterial.SetFloat("_EID3336B6IndirectSpecularStrength", b6IndirectSpecularStrength);
-        SetB6Constants();
-        ApplyProbeConstantsToMaterial();
+        ApplyControllerB6TuningToMaterial(b6LightingMaterial);
 #if UNITY_EDITOR
         if (!Application.isPlaying)
             EditorUtility.SetDirty(b6LightingMaterial);
 #endif
+    }
+
+    // The serialized material is the Inspector-facing tuning source. Runtime
+    // cameras receive the same scalar/vector inputs on their own material.
+    void ApplyControllerB6TuningToMaterial(Material material)
+    {
+        if (material == null) return;
+        LoadB6Assets();
+
+        material.SetTexture("_EID3336B6ScreenSH", b6ScreenSH);
+        material.SetTexture("_EID3336B6ScreenSpecularColor", b6ScreenSpecularColor);
+        material.SetTexture("_EID3336B6ScreenSpecularWeight", b6ScreenSpecularWeight);
+        material.SetTexture("_EID3336B6ReflectionValidity", b6ReflectionValidity);
+        material.SetTexture("_EID3336B6ReflectionVisibility", b6ReflectionVisibility);
+        material.SetTexture("_EID3336B6SSAO", b6SSAO);
+        material.SetTexture("_EID3336B6ReflectionAtlas", b6ReflectionAtlas);
+        material.SetFloat("_EID3336B6ViewMode", (float)b6ViewMode);
+        material.SetFloat("_EID3336B6ScreenSHWeight", b6ScreenSHWeight);
+        material.SetFloat("_EID3336B6ScreenSpecularContributionWeight", b6ScreenSpecularContributionWeight);
+        material.SetFloat("_EID3336B6ProbeReflectionWeight", b6ProbeReflectionWeight);
+        material.SetFloat("_EID3336B6CapturedVisibilityWeight", b6CapturedVisibilityWeight);
+        material.SetFloat("_EID3336B6WorldDisplayRange", worldPositionRange);
+        material.SetFloat("_EID3336B6DepthDisplayFar", depthDisplayFar);
+        material.SetFloat("_EID3336B6ReconstructionFlipY", reconstructionFlipY ? 1f : 0f);
+        material.SetFloat("_EID3336B6FlipY", b6FlipY ? 1f : 0f);
+        Vector3 d = lightDirectionWS.sqrMagnitude > 1e-6f ? lightDirectionWS.normalized : Vector3.up;
+        material.SetVector("_EID3336B6LightDirectionWS", new Vector4(d.x, d.y, d.z, 0f));
+        material.SetColor("_EID3336B6LightColor", lightColor);
+        material.SetFloat("_EID3336B6LightIntensity", lightIntensity);
+        material.SetFloat("_EID3336B6AmbientStrength", ambientStrength);
+        material.SetFloat("_EID3336B6DiffuseStrength", 1f);
+        material.SetFloat("_EID3336B6SpecularStrength", specularStrength);
+        material.SetFloat("_EID3336B6IndirectDiffuseStrength", b6IndirectDiffuseStrength);
+        material.SetFloat("_EID3336B6IndirectSpecularStrength", b6IndirectSpecularStrength);
+        SetB6Constants(material);
+        ApplyProbeConstantsToMaterial(material);
     }
 
     void LoadB6Assets()
@@ -606,46 +646,52 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
 
     static float F(byte[] d, int o) => BitConverter.ToSingle(d, o);
     static Vector4 V(byte[] d, int o) => new Vector4(F(d,o),F(d,o+4),F(d,o+8),F(d,o+12));
-    void SetB6Constants()
+    void SetB6Constants(Material material)
     {
+        if (material == null) return;
         string root = ProjectFile(CapturedRoot + "/raw"); string p9 = Path.Combine(root, "cb_uniforms9_b29.bin");
-        if (File.Exists(p9)) { var d=File.ReadAllBytes(p9); if(d.Length>=512){b6LightingMaterial.SetVector("_EID3336B6IndirectScale",V(d,464));b6LightingMaterial.SetVector("_EID3336B6IndirectOptions",b6UseCapturedIndirectOptions?V(d,480):new Vector4(1,1,1,1));b6LightingMaterial.SetVector("_EID3336B6ReflectionMipParameters",V(d,496));b6LightingMaterial.SetVector("_EID3336B6ClusterOffsets",V(d,448));b6LightingMaterial.SetFloat("_EID3336B6TextureMipBias",F(d,416));if(d.Length>=2240){b6LightingMaterial.SetVector("_EID3336B6FallbackSHRed",V(d,2160));b6LightingMaterial.SetVector("_EID3336B6FallbackSHGreen",V(d,2176));b6LightingMaterial.SetVector("_EID3336B6FallbackSHBlue",V(d,2192));}}}
+        if (File.Exists(p9)) { var d=File.ReadAllBytes(p9); if(d.Length>=512){material.SetVector("_EID3336B6IndirectScale",V(d,464));material.SetVector("_EID3336B6IndirectOptions",b6UseCapturedIndirectOptions?V(d,480):new Vector4(1,1,1,1));material.SetVector("_EID3336B6ReflectionMipParameters",V(d,496));material.SetVector("_EID3336B6ClusterOffsets",V(d,448));material.SetFloat("_EID3336B6TextureMipBias",F(d,416));if(d.Length>=2240){material.SetVector("_EID3336B6FallbackSHRed",V(d,2160));material.SetVector("_EID3336B6FallbackSHGreen",V(d,2176));material.SetVector("_EID3336B6FallbackSHBlue",V(d,2192));}}}
     }
-    void ApplyProbeConstantsToMaterial()
+    void ApplyProbeConstantsToMaterial(Material material)
     {
-        if (b6LightingMaterial == null || !b6UseCapturedProbeData) return;
+        if (material == null) return;
+        if (material == null || !b6UseCapturedProbeData) return;
         string cp = Path.Combine(ProjectFile(CapturedRoot + "/raw"), "cb_uniforms26_b30.bin");
         if (!File.Exists(cp)) return;
         byte[] cb = File.ReadAllBytes(cp);
         if (cb.Length < 4160) return;
-        b6LightingMaterial.SetVector("_EID3336B6ProbeClusterGrid", V(cb, 0));
-        b6LightingMaterial.SetVector("_EID3336B6ProbeAtlasLayout", V(cb, 16));
-        b6LightingMaterial.SetVector("_EID3336B6ProbeDepthAndAtlasOffset", V(cb, 32));
-        b6LightingMaterial.SetVector("_EID3336B6FallbackProbeNormalPlane", V(cb, 48));
+        material.SetVector("_EID3336B6ProbeClusterGrid", V(cb, 0));
+        material.SetVector("_EID3336B6ProbeAtlasLayout", V(cb, 16));
+        material.SetVector("_EID3336B6ProbeDepthAndAtlasOffset", V(cb, 32));
+        material.SetVector("_EID3336B6FallbackProbeNormalPlane", V(cb, 48));
     }
 
-    void EnsureProbeBuffers()
+    void EnsureProbeBuffers(Material material)
     {
-        if (reflectionProbeBuffer != null || !b6UseCapturedProbeData || b6LightingMaterial == null) return;
-        string root = ProjectFile(CapturedRoot + "/raw");
-        string cp = Path.Combine(root, "cb_uniforms26_b30.bin");
-        string mp = Path.Combine(root, "ssbo_cluster_b31.bin");
-        if (!File.Exists(cp) || !File.Exists(mp)) return;
-        byte[] cb = File.ReadAllBytes(cp);
-        if (cb.Length < 4160) return;
-        if (!b6MaterialOwnsTuningParameters)
-            ApplyProbeConstantsToMaterial();
-        Vector4[] probes = new Vector4[32 * 8];
-        for (int i = 0; i < probes.Length; i++) probes[i] = V(cb, 64 + i * 16);
-        reflectionProbeBuffer = new ComputeBuffer(probes.Length, 16, ComputeBufferType.Structured);
-        reflectionProbeBuffer.SetData(probes);
-        b6LightingMaterial.SetBuffer("_EID3336B6ReflectionProbes", reflectionProbeBuffer);
-        byte[] raw = File.ReadAllBytes(mp);
-        uint[] masks = new uint[raw.Length / 4];
-        Buffer.BlockCopy(raw, 0, masks, 0, raw.Length);
-        clusterMaskBuffer = new ComputeBuffer(masks.Length, 4, ComputeBufferType.Raw);
-        clusterMaskBuffer.SetData(masks);
-        b6LightingMaterial.SetBuffer("_EID3336B6ClusterProbeMasks", clusterMaskBuffer);
+        if (material == null || !b6UseCapturedProbeData) return;
+        if (reflectionProbeBuffer == null || clusterMaskBuffer == null)
+        {
+            string root = ProjectFile(CapturedRoot + "/raw");
+            string cp = Path.Combine(root, "cb_uniforms26_b30.bin");
+            string mp = Path.Combine(root, "ssbo_cluster_b31.bin");
+            if (!File.Exists(cp) || !File.Exists(mp)) return;
+            byte[] cb = File.ReadAllBytes(cp);
+            byte[] raw = File.ReadAllBytes(mp);
+            if (cb.Length < 4160 || raw.Length == 0 || raw.Length % 4 != 0) return;
+            reflectionProbeBuffer?.Release();
+            clusterMaskBuffer?.Release();
+            Vector4[] probes = new Vector4[32 * 8];
+            for (int i = 0; i < probes.Length; i++) probes[i] = V(cb, 64 + i * 16);
+            reflectionProbeBuffer = new ComputeBuffer(probes.Length, 16, ComputeBufferType.Structured);
+            reflectionProbeBuffer.SetData(probes);
+            uint[] masks = new uint[raw.Length / 4];
+            Buffer.BlockCopy(raw, 0, masks, 0, raw.Length);
+            clusterMaskBuffer = new ComputeBuffer(masks.Length, 4, ComputeBufferType.Raw);
+            clusterMaskBuffer.SetData(masks);
+        }
+        // Allocation is shared, binding is per-camera material and must never be skipped.
+        material.SetBuffer("_EID3336B6ReflectionProbes", reflectionProbeBuffer);
+        material.SetBuffer("_EID3336B6ClusterProbeMasks", clusterMaskBuffer);
     }
     void ReleaseB6Buffers(){reflectionProbeBuffer?.Release();clusterMaskBuffer?.Release();reflectionProbeBuffer=null;clusterMaskBuffer=null;if(runtimeB6Material!=null){if(Application.isPlaying)Destroy(runtimeB6Material);else DestroyImmediate(runtimeB6Material);runtimeB6Material=null;}}
     public void SetLiveFinalTexture(Camera camera, RenderTexture texture){if(camera!=null){if(camera.cameraType==CameraType.SceneView)liveSceneViewFinalTexture=texture;else if(camera==targetCamera)liveGameFinalTexture=texture;}}
@@ -657,5 +703,9 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
 
 
 
+
+
+
+// Native URP five-GBuffer lightpass integration marker.
 
 

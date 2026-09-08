@@ -592,6 +592,12 @@ namespace UnityEngine.Rendering.Universal.Internal
 
         internal void ExecuteDeferredPass(ScriptableRenderContext context, ref RenderingData renderingData)
         {
+            if (UseEID3336FiveMRT)
+            {
+                ExecuteEID3336LightPass(context, ref renderingData, GbufferAttachments, DepthCopyTexture);
+                return;
+            }
+
             // Workaround for bug.
             // When changing the URP asset settings (ex: shadow cascade resolution), all ScriptableRenderers are recreated but
             // materials passed in have not finished initializing at that point if they have fallback shader defined. In particular deferred shaders only have 1 pass available,
@@ -626,6 +632,67 @@ namespace UnityEngine.Rendering.Universal.Internal
             CoreUtils.SetKeyword(cmd, ShaderKeywordStrings.AdditionalLightShadows, renderingData.shadowData.isKeywordAdditionalLightShadowsEnabled);
             ShadowUtils.SetSoftShadowQualityShaderKeywords(cmd, ref renderingData.shadowData);
             CoreUtils.SetKeyword(cmd, ShaderKeywordStrings.LightCookies, m_LightCookieManager != null && m_LightCookieManager.IsKeywordLightCookieEnabled);
+        }
+
+        static readonly ProfilingSampler s_EID3336LightPass = new ProfilingSampler("EID3336 Custom Deferred LightPass (5 GBuffer)");
+        readonly System.Collections.Generic.Dictionary<int, string> m_EID3336LightingErrors =
+            new System.Collections.Generic.Dictionary<int, string>();
+
+        void ReportEID3336LightingError(Camera camera, string reason)
+        {
+            int id = camera != null ? camera.GetInstanceID() : 0;
+            if (m_EID3336LightingErrors.TryGetValue(id, out var previous) && previous == reason) return;
+            m_EID3336LightingErrors[id] = reason;
+            Debug.LogError("[EID3336 LightPass] " + (camera != null ? camera.name : "null") + ": " + reason);
+        }
+
+        internal void ExecuteEID3336LightPass(ScriptableRenderContext context, ref RenderingData renderingData,
+            RTHandle[] inputs, RTHandle sampledDepth)
+        {
+            Camera camera = renderingData.cameraData.camera;
+            if (inputs == null || inputs.Length < 5 || sampledDepth == null || sampledDepth.rt == null)
+            {
+                ReportEID3336LightingError(camera, "Missing five GBuffer inputs or sampled depth. Check GBuffer/CopyDepth setup.");
+                return;
+            }
+            for (int i = 0; i < 5; ++i)
+                if (inputs[i] == null || inputs[i].rt == null)
+                {
+                    ReportEID3336LightingError(camera, "Missing GBuffer" + i);
+                    return;
+                }
+            if (!EID3336LightingParameters.TryPrepare(camera, out var material) ||
+                material == null || material.shader == null || !material.shader.isSupported || material.passCount == 0)
+            {
+                ReportEID3336LightingError(camera, "No ready custom lighting material/parameters for this camera. Check camera assignment, B6 enable and shader compilation.");
+                return;
+            }
+
+            // The five captured GBuffer textures are not UnityGBuffer's stock four-target layout.
+            for (int i = 0; i < 5; ++i) material.SetTexture("_EID3336B6RT" + i, inputs[i].rt);
+            material.SetTexture("_EID3336B6Depth", sampledDepth.rt);
+            material.SetFloat("_EID3336B6UseURPGBuffer", 0f);
+            material.SetFloat("_EID3336B6MaterialTarget", 2f);
+            material.SetFloat("_EID3336B6NormalTarget", 3f);
+            material.SetFloat("_EID3336B6BaseColorTarget", 4f);
+            // Match the existing GBuffer VS convention exactly; do not alter its transforms.
+            Matrix4x4 view = camera.worldToCameraMatrix;
+            Matrix4x4 worldToClip = GL.GetGPUProjectionMatrix(camera.projectionMatrix, true) * view;
+            material.SetMatrix("_EID3336B6ClipToWorld", worldToClip.inverse);
+            material.SetMatrix("_EID3336B6WorldToView", view);
+            material.SetVector("_EID3336B6CameraPositionWS", camera.transform.position);
+            int w = Mathf.Max(1, renderingData.cameraData.cameraTargetDescriptor.width);
+            int h = Mathf.Max(1, renderingData.cameraData.cameraTargetDescriptor.height);
+            material.SetVector("_EID3336B6ScreenSize", new Vector4(w, h, 1f / w, 1f / h));
+            material.SetVector("_EID3336B6OutputSize", new Vector4(w, h, 1f / w, 1f / h));
+
+            // DeferredPass declares CameraColor. No SetRenderTarget from scene code and no extra command buffer.
+            var cmd = renderingData.commandBuffer;
+            using (new ProfilingScope(cmd, s_EID3336LightPass))
+                cmd.DrawProcedural(Matrix4x4.identity, material, 0, MeshTopology.Triangles, 3, 1);
+            context.ExecuteCommandBuffer(cmd);
+            cmd.Clear();
+            m_EID3336LightingErrors.Remove(camera.GetInstanceID());
         }
 
         // adapted from ForwardLights.SetupShaderLightConstants
@@ -1238,3 +1305,6 @@ namespace UnityEngine.Rendering.Universal.Internal
     };
     */
 }
+
+// Native URP five-GBuffer lightpass integration marker.
+

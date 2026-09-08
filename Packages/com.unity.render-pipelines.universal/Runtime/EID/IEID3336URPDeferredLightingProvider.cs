@@ -1,24 +1,37 @@
-using UnityEngine.Rendering;
-using UnityEngine.Rendering.Universal;
+using System.Collections.Generic;
 
 namespace UnityEngine.Rendering.Universal
 {
-    /// <summary>
-    /// Implemented by scene-side integrations that replace the lighting
-    /// attachment in URP's DeferredPass instead of stock lighting. This keeps the extension
-    /// in the embedded URP source path rather than a RendererFeature.
-    /// </summary>
-    // sourceFiveMrt is the actual per-camera layout selected by DeferredLights.
-    // Providers must not infer it from legacy scene configuration.
+    /// <summary>Supplies captured lighting parameters only. URP owns targets, camera inputs and draws.</summary>
     public interface IEID3336URPDeferredLightingProvider
     {
-        bool RecordEID3336DeferredLighting(
-            ScriptableRenderContext context,
-            ref RenderingData renderingData,
-            RTHandle[] gbufferAttachments,
-            RTHandle lightingAttachment,
-            RTHandle depthAttachment,
-            RTHandle depthCopyTexture,
-            bool sourceFiveMrt);
+        bool TryPrepareEID3336Lighting(Camera camera, out Material material);
+    }
+
+    public static class EID3336LightingParameters
+    {
+        static readonly List<IEID3336URPDeferredLightingProvider> s_Providers =
+            new List<IEID3336URPDeferredLightingProvider>();
+
+        public static void Register(IEID3336URPDeferredLightingProvider provider)
+        {
+            if (provider != null && !s_Providers.Contains(provider)) s_Providers.Add(provider);
+        }
+
+        public static void Unregister(IEID3336URPDeferredLightingProvider provider)
+        {
+            s_Providers.Remove(provider);
+        }
+
+        internal static bool TryPrepare(Camera camera, out Material material)
+        {
+            material = null;
+            foreach (var provider in s_Providers)
+            {
+                if (provider is Object obj && obj == null) continue;
+                if (provider.TryPrepareEID3336Lighting(camera, out material)) return true;
+            }
+            return false;
+        }
     }
 }

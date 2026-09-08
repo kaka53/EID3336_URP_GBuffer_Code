@@ -90,7 +90,11 @@ float3 EID3336B6CapturedIrradiance(float2 uv, float3 normalWS)
         dot(_EID3336B6FallbackSHBlue.xyz, normalWS) + _EID3336B6FallbackSHBlue.w));
     float4 encoded = SAMPLE_TEXTURE2D(_EID3336B6ScreenSH, sampler_EID3336B6ScreenSH, uv);
     float useScreen = step(0.0001, dot(abs(encoded), 1.0.xxxx));
-    float screenBlend = useScreen * saturate(_EID3336B6ScreenSHWeight);
+    // screen_sh_b5 is captured from the original camera and may contain the old character.
+    // b6ScreenSHWeight is a removal weight: 0 = keep the captured screen SH,
+    // 1 = lerp(screen_sh_b5, 0, 1), removing its contribution completely.
+    float screenSHRemovalWeight = saturate(_EID3336B6ScreenSHWeight);
+    float screenBlend = useScreen * (1.0 - screenSHRemovalWeight);
     float3 screenIrradiance = max(0.0.xxx, encoded.xxx + encoded.yzx * normalWS * 1.5);
     return lerp(fallback, screenIrradiance, screenBlend);
 }
@@ -264,6 +268,9 @@ float4 EID3336B6PS(EID3336B6VSOut i) : SV_Target0
     return float4(saturate(output), 1);
 }
 #endif
+
+
+
 
 
 

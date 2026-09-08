@@ -33,77 +33,23 @@ namespace UnityEngine.Rendering.Universal.Internal
                 ConfigureInputAttachments(m_DeferredLights.DeferredInputAttachments, m_DeferredLights.DeferredInputIsTransient);
 
             // TODO: Cannot currently bind depth texture as read-only!
-            ConfigureTarget(lightingAttachment, depthAttachment);
+            if (m_DeferredLights.UseEID3336FiveMRT)
+                ConfigureTarget(lightingAttachment);
+            else
+                ConfigureTarget(lightingAttachment, depthAttachment);
         }
 
         // ScriptableRenderPass
         public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
         {
-            // EID route-B source-level integration point. Run before stock
-            // deferred lighting so the recovered result is not overwritten by
-            // StencilDeferred. The provider writes the same lighting attachment
-            // that stock URP would shade, then we skip stock light accumulation.
-            if (RecordEID3336DeferredLighting(context, ref renderingData))
-                return;
-
-            // Raw RT0..RT4 do not implement UnityGBuffer's four-target
-            // decoder. If the EID provider intentionally disables B6 for a
-            // GBuffer capture, leave the lighting target untouched instead of
-            // feeding the raw attachments into StencilDeferred.
-            if (m_DeferredLights.UseEID3336FiveMRT)
-                return;
-
             m_DeferredLights.ExecuteDeferredPass(context, ref renderingData);
-
-            // EID route-B source-level integration point. Meshes have already
-            // populated the standard URP GBuffer through DrawRenderers(). The
-            // provider is called after stock deferred lighting so it can use
-            // the same GBuffer/depth attachments and replace the lighting
-            // result without a second RendererFeature pass.
-            // Provider was already given first refusal above; this call is
-            // retained only for non-route-B providers that do not replace the
-            // stock pass. Route-B returns true and exits before reaching here.
-            RecordEID3336DeferredLighting(context, ref renderingData);
-        }
-
-        bool RecordEID3336DeferredLighting(ScriptableRenderContext context, ref RenderingData renderingData)
-        {
-            bool replaced = false;
-            var providers = Object.FindObjectsOfType<MonoBehaviour>(true);
-            if (providers == null || providers.Length == 0)
-                return false;
-
-            for (int i = 0; i < providers.Length; ++i)
-            {
-                if (!(providers[i] is IEID3336URPDeferredLightingProvider provider))
-                    continue;
-                try
-                {
-                    RTHandle[] gbufferAttachments = m_DeferredLights.GbufferAttachments;
-                    RTHandle lightingAttachment = gbufferAttachments != null &&
-                        gbufferAttachments.Length > m_DeferredLights.GBufferLightingIndex
-                        ? gbufferAttachments[m_DeferredLights.GBufferLightingIndex] : null;
-                    replaced |= provider.RecordEID3336DeferredLighting(
-                        context,
-                        ref renderingData,
-                        gbufferAttachments,
-                        lightingAttachment,
-                        m_DeferredLights.DepthAttachment,
-                        m_DeferredLights.DepthCopyTexture,
-                        m_DeferredLights.UseEID3336FiveMRT);
-                }
-                catch (System.Exception ex)
-                {
-                    Debug.LogException(ex, providers[i]);
-                }
-            }
-            return replaced;
         }
 
         private class PassData
         {
             internal TextureHandle color;
             internal TextureHandle depth;
+            internal TextureHandle[] gbuffer;
 
             internal RenderingData renderingData;
             internal DeferredLights deferredLights;
@@ -115,8 +61,11 @@ namespace UnityEngine.Rendering.Universal.Internal
                 base.profilingSampler))
             {
                 passData.color = builder.UseColorBuffer(color, 0);
-                passData.depth = builder.UseDepthBuffer(depth, DepthAccess.ReadWrite);
+                passData.depth = m_DeferredLights.UseEID3336FiveMRT
+                    ? builder.ReadTexture(depth)
+                    : builder.UseDepthBuffer(depth, DepthAccess.ReadWrite);
                 passData.deferredLights = m_DeferredLights;
+                passData.gbuffer = gbuffer;
                 passData.renderingData = renderingData;
 
                 for (int i = 0; i < gbuffer.Length; ++i)
@@ -129,7 +78,17 @@ namespace UnityEngine.Rendering.Universal.Internal
 
                 builder.SetRenderFunc((PassData data, RenderGraphContext context) =>
                 {
-                    data.deferredLights.ExecuteDeferredPass(context.renderContext, ref data.renderingData);
+                    if (data.deferredLights.UseEID3336FiveMRT)
+                    {
+                        // Resolve graph-owned inputs at execution time; never use compatibility RTHandles here.
+                        var inputs = new RTHandle[5];
+                        for (int i = 0; i < inputs.Length; ++i)
+                            inputs[i] = data.gbuffer[i];
+                        data.deferredLights.ExecuteEID3336LightPass(context.renderContext,
+                            ref data.renderingData, inputs, data.depth);
+                    }
+                    else
+                        data.deferredLights.ExecuteDeferredPass(context.renderContext, ref data.renderingData);
                 });
             }
         }
@@ -140,7 +99,3 @@ namespace UnityEngine.Rendering.Universal.Internal
         }
     }
 }
-
-
-
-

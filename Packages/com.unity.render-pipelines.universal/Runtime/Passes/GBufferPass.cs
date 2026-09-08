@@ -245,7 +245,8 @@ namespace UnityEngine.Rendering.Universal.Internal
             // material draw. Providers are used only as a readback bridge for
             // validation; they must run after DrawRenderers so they cannot
             // replace or overdraw the standard URP GBuffer result.
-            RecordEID3336Providers(context, ref renderingData, data.deferredLights);
+            if (!data.deferredLights.UseEID3336FiveMRT)
+                RecordEID3336Providers(context, ref renderingData, data.deferredLights);
 
             // Render objects that did not match any shader pass with error shader
             RenderingUtils.RenderObjectsWithError(context, ref renderingData.cullResults, renderingData.cameraData.camera, data.filteringSettings, SortingCriteria.None);
@@ -297,7 +298,9 @@ namespace UnityEngine.Rendering.Universal.Internal
                     {
                         frameResources.gbuffer[i] = cameraColor;
                     }
-                    passData.gbuffer[i] = builder.UseColorBuffer(frameResources.gbuffer[i], i);
+                    // CameraColor is a separate LightPass output, not a sixth geometry MRT.
+                    if (!m_DeferredLights.UseEID3336FiveMRT || i < 5)
+                        passData.gbuffer[i] = builder.UseColorBuffer(frameResources.gbuffer[i], i);
                 }
 
                 passData.deferredLights = m_DeferredLights;
@@ -322,7 +325,9 @@ namespace UnityEngine.Rendering.Universal.Internal
                 passData.gbuffer = frameResources.gbuffer = m_DeferredLights.GbufferTextureHandles;
                 for (int i = 0; i < m_DeferredLights.GBufferSliceCount; i++)
                 {
-                    passData.gbuffer[i] = builder.UseColorBuffer(frameResources.gbuffer[i], i);
+                    // CameraColor is a separate LightPass output, not a sixth geometry MRT.
+                    if (!m_DeferredLights.UseEID3336FiveMRT || i < 5)
+                        passData.gbuffer[i] = builder.UseColorBuffer(frameResources.gbuffer[i], i);
                 }
                 passData.depth = builder.UseDepthBuffer(cameraDepth, DepthAccess.Read);
                 passData.renderingData = renderingData;
