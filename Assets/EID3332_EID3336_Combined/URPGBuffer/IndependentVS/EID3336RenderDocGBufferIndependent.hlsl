@@ -4,8 +4,10 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/UnityGBuffer.hlsl"
 #include "../../Geometry/EID3336VS209986_IndependentURP_Runtime.hlsl"
-// Material-local controls. These are written by UnityPerMaterial and are
-// intentionally not overwritten by the URP command buffer.
+
+// The recovered PS declares its own Texture2D/Texture2DArray resources and
+// RenderDoc-named constant buffers. URP already owns the standard sampler
+// states, so only the sampler aliases are reused here.
 CBUFFER_START(UnityPerMaterial)
 float4 _EID3336VSLocalParameter0;
 float4 _EID3336VSLocalParameter1;
@@ -14,7 +16,67 @@ float4 _EID3336VSLocalScale;
 float4 _EID3336VSLocalOffset;
 float4 _EID3336VSLocalFlags;
 float _EID3336UseLocalVSOverrides;
+float4 _EID3336PSLocalUV0ScaleOffset;
+float4 _EID3336PSLocalUV1ScaleOffset;
+float4 _EID3336PSLocalFlags;
+float _EID3336PSLocalUseUVTransform;
+float _EID3336PSLocalFlipUVY;
+
+float4 _EID3336PSLocalParam00;
+float4 _EID3336PSLocalParam01;
+float4 _EID3336PSLocalParam02;
+float4 _EID3336PSLocalParam03;
+float4 _EID3336PSLocalParam04;
+float4 _EID3336PSLocalParam05;
+float4 _EID3336PSLocalParam06;
+float4 _EID3336PSLocalParam07;
+float4 _EID3336PSLocalParam08;
+float4 _EID3336PSLocalParam09;
+float4 _EID3336PSLocalParam10;
+float4 _EID3336PSLocalParam11;
+float4 _EID3336PSLocalParam12;
+float4 _EID3336PSLocalParam13;
+float4 _EID3336PSLocalParam14;
+float4 _EID3336PSLocalParam15;
+float4 _EID3336PSLocalParam16;
+float4 _EID3336PSLocalParam17;
+float4 _EID3336PSLocalParam18;
+float4 _EID3336PSLocalParam19;
+float4 _EID3336PSLocalParam20;
+float4 _EID3336PSLocalParam21;
+float4 _EID3336PSLocalParam22;
+float4 _EID3336PSLocalParam23;
+float4 _EID3336PSLocalParam24;
+float4 _EID3336PSLocalParam25;
+float4 _EID3336PSLocalParam26;
+float4 _EID3336PSLocalParam27;
+float4 _EID3336PSLocalParam28;
+float4 _EID3336PSLocalParam29;
+float4 _EID3336PSLocalParam30;
+float4 _EID3336PSLocalParam31;
+float4 _EID3336PSLocalParam32;
+float4 _EID3336PSLocalParam33;
+float4 _EID3336PSLocalParam34;
+float4 _EID3336PSLocalParam35;
+float4 _EID3336PSLocalParam36;
+float4 _EID3336PSLocalParam37;
+float4 _EID3336PSLocalParam38;
+float4 _EID3336PSLocalParam39;
+float4 _EID3336PSLocalParam40;
+float4 _EID3336PSLocalParam41;
+float4 _EID3336PSLocalParam42;
+float4 _EID3336PSLocalParam43;
+float4 _EID3336PSLocalParam44;
+float _EID3336PSUseLocalParams;
 CBUFFER_END
+
+#define EID3336_PS_USE_MATERIAL_44
+#define EID3336_PS_EXTERNAL_SAMPLERS
+#include "../../Geometry/EID3332CombinedPS209987_ExactUnity.hlsl"
+#undef EID3336_PS_EXTERNAL_SAMPLERS
+
+// Material-local controls. Frame/draw constants (_18_19 ... _51_52) remain
+// pipeline-owned; these values are intentionally left to the material.
 
 
 struct EID3336IndependentAttributes
@@ -31,20 +93,15 @@ struct EID3336IndependentAttributes
     float4 uv5 : TEXCOORD5;
 };
 
-// The independent RenderDoc contract is five color attachments. RT5 is the
-// URP camera-color/lighting attachment and is intentionally not written by
-// this geometry pass.
 struct EID3336IndependentGBufferOutput
 {
-    half4 GBuffer0 : SV_Target0;
-    half4 GBuffer1 : SV_Target1;
-    half4 GBuffer2 : SV_Target2;
-    half4 GBuffer3 : SV_Target3;
-    half4 GBuffer4 : SV_Target4;
+    float4 GBuffer0 : SV_Target0;
+    float4 GBuffer1 : SV_Target1;
+    float4 GBuffer2 : SV_Target2;
+    float4 GBuffer3 : SV_Target3;
+    float4 GBuffer4 : SV_Target4;
 };
 
-// Unity's input ABI is the only adapter. The recovered VS209986 body then
-// performs the captured math, while its matrix slots are supplied by URP.
 EID3336_VS_Output EID3336IndependentVertex(EID3336IndependentAttributes input)
 {
     EID3336_VS_Input v;
@@ -60,32 +117,77 @@ EID3336_VS_Output EID3336IndependentVertex(EID3336IndependentAttributes input)
     v.VS_12 = (uint4)round(input.uv5);
 
     // Optional material-local object-space adjustment. It is disabled by
-    // default, so Unity Transform remains the authoritative object-to-world
-    // transform. Enabling it proves that local material parameters are not
-    // overwritten by the pipeline.
+    // default, leaving the Unity Transform as the source of world position.
     if (_EID3336UseLocalVSOverrides > 0.5)
-    {
         v.VS_3 = v.VS_3 * _EID3336VSLocalScale.xyz + _EID3336VSLocalOffset.xyz;
-    }
 
-    // One shared material is used by all three MeshRenderers. The captured
-    // records differ only in m0/m3, which are replaced by UNITY_MATRIX_M;
-    // the remaining VS constants are identical, so record 0 is authoritative.
     v.EID3336_VS_InstanceIndex = 0u;
-    return EID3336ExactVS(v);
+    return EID3336ExactVSCore(v);
 }
 
-EID3336IndependentGBufferOutput EID3336IndependentWhiteFragment(EID3336_VS_Output input)
+SPIRV_Cross_Input EID3336IndependentBuildPSInput(EID3336_VS_Output input, bool frontFace)
 {
-    EID3336IndependentGBufferOutput o;
-    // White diagnostic payload: each attachment must visibly receive a write
-    // before the RenderDoc channel encoders are introduced.
-    o.GBuffer0 = half4(1,1,1,1);
-    o.GBuffer1 = half4(1,1,1,1);
-    o.GBuffer2 = half4(1,1,1,1);
-    o.GBuffer3 = half4(1,1,1,1);
-    o.GBuffer4 = half4(1,1,1,1);
-    return o;
+    SPIRV_Cross_Input capturedInput;
+    capturedInput._4 = input.VS_15;
+    capturedInput._5 = input.VS_16;
+
+    // Local UV controls are applied only at the adapter boundary. The PS body
+    // below remains the recovered PS209987 algorithm with no color/gamma or
+    // channel remapping added.
+    if (_EID3336PSLocalUseUVTransform > 0.5)
+    {
+        capturedInput._4 = capturedInput._4 * _EID3336PSLocalUV0ScaleOffset.xy
+                         + _EID3336PSLocalUV0ScaleOffset.zw;
+        capturedInput._5 = capturedInput._5 * _EID3336PSLocalUV1ScaleOffset.xy
+                         + _EID3336PSLocalUV1ScaleOffset.zw;
+    }
+    if (_EID3336PSLocalFlipUVY > 0.5)
+    {
+        capturedInput._4.y = 1.0 - capturedInput._4.y;
+        capturedInput._5.y = 1.0 - capturedInput._5.y;
+    }
+
+    capturedInput._6 = input.VS_17;
+    capturedInput._7 = input.VS_18;
+    capturedInput._8 = input.VS_19;
+    capturedInput._9 = input.VS_21;
+    capturedInput._10 = input.VS_22;
+    capturedInput._11 = input.VS_23;
+    capturedInput.gl_FragCoord = input.EID3336_VS_Position;
+    capturedInput.gl_FrontFacing = frontFace;
+    return capturedInput;
+}
+
+EID3336IndependentGBufferOutput EID3336IndependentGBufferFragment(
+    EID3336_VS_Output input,
+    bool frontFace : SV_IsFrontFace)
+{
+    SPIRV_Cross_Output captured = EID3336ExactPS(
+        EID3336IndependentBuildPSInput(input, frontFace));
+
+    // RenderDoc PS209987 output contract, kept byte/channel order exact:
+    // _13 -> RT0, _17 -> RT1, _14 -> RT2, _15 -> RT3, _16 -> RT4.
+    EID3336IndependentGBufferOutput output;
+    output.GBuffer0 = captured._13;
+    output.GBuffer1 = captured._17;
+    output.GBuffer2 = captured._14;
+    output.GBuffer3 = captured._15;
+    output.GBuffer4 = captured._16;
+    return output;
+}
+
+// Retained diagnostic entry point for quick attachment-write checks.
+EID3336IndependentGBufferOutput EID3336IndependentWhiteFragment(
+    EID3336_VS_Output input,
+    bool frontFace : SV_IsFrontFace)
+{
+    EID3336IndependentGBufferOutput output;
+    output.GBuffer0 = 1.0;
+    output.GBuffer1 = 1.0;
+    output.GBuffer2 = 1.0;
+    output.GBuffer3 = 1.0;
+    output.GBuffer4 = 1.0;
+    return output;
 }
 
 #endif

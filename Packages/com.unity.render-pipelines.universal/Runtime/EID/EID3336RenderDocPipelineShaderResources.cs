@@ -17,7 +17,7 @@ namespace UnityEngine.Rendering.Universal.Internal
             ("_18_19", "EID3336CB/_18_19"),
             ("_20_21", "EID3336CB/_20_21"),
             ("_22_24", "EID3336CB/_22_24"),
-            ("_43_44", "EID3336CB/_43_44"),
+            ("_43_44_CAPTURE", "EID3336CB/_43_44"),
             ("_45_46", "EID3336CB/_45_46"),
             ("_47_48", "EID3336CB/_47_48"),
             ("_49_50", "EID3336CB/_49_50"),
@@ -110,3 +110,4 @@ namespace UnityEngine.Rendering.Universal.Internal
         }
     }
 }
+

@@ -5,9 +5,11 @@ namespace UnityEngine.Rendering.Universal
 {
     /// <summary>
     /// Implemented by scene-side integrations that replace the lighting
-    /// attachment after URP's stock DeferredPass. This keeps the extension
+    /// attachment in URP's DeferredPass instead of stock lighting. This keeps the extension
     /// in the embedded URP source path rather than a RendererFeature.
     /// </summary>
+    // sourceFiveMrt is the actual per-camera layout selected by DeferredLights.
+    // Providers must not infer it from legacy scene configuration.
     public interface IEID3336URPDeferredLightingProvider
     {
         bool RecordEID3336DeferredLighting(
@@ -16,6 +18,7 @@ namespace UnityEngine.Rendering.Universal
             RTHandle[] gbufferAttachments,
             RTHandle lightingAttachment,
             RTHandle depthAttachment,
-            RTHandle depthCopyTexture);
+            RTHandle depthCopyTexture,
+            bool sourceFiveMrt);
     }
 }

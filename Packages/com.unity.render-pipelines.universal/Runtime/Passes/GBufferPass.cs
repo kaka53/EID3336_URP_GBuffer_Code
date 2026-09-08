@@ -128,9 +128,14 @@ namespace UnityEngine.Rendering.Universal.Internal
                 ConfigureTarget(m_DeferredLights.GbufferAttachments, m_DeferredLights.DepthAttachment, m_DeferredLights.GbufferFormats);
             }
 
-            // We must explicitly specify we don't want any clear to avoid unwanted side-effects.
-            // ScriptableRenderer will implicitly force a clear the first time the camera color/depth targets are bound.
-            ConfigureClear(ClearFlag.None, Color.black);
+            // The recovered five-MRT path owns persistent RTHandles and is rendered every frame.
+            // Do not load color/depth from the previous frame: an uncovered pixel would otherwise
+            // keep the previous object's GBuffer/depth and appear as a moving-object ghost.
+            // Keep stock URP's original load/clear policy unchanged for the normal four-MRT path.
+            if (m_DeferredLights.UseEID3336FiveMRT)
+                ConfigureClear(ClearFlag.Color | ClearFlag.Depth, Color.clear);
+            else
+                ConfigureClear(ClearFlag.None, Color.black);
         }
 
         public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
@@ -176,21 +181,22 @@ namespace UnityEngine.Rendering.Universal.Internal
             }
         }
 
-        void RecordEID3336Providers(ScriptableRenderContext context, ref RenderingData renderingData)
+        static void RecordEID3336Providers(ScriptableRenderContext context, ref RenderingData renderingData, DeferredLights deferredLights)
         {
             var providers = Object.FindObjectsOfType<MonoBehaviour>(true);
+            Debug.Log("[EID3336 GBufferPass] provider scan camera=" + (renderingData.cameraData.camera != null ? renderingData.cameraData.camera.name : "null") + " count=" + (providers != null ? providers.Length.ToString() : "0") + " five=" + (deferredLights != null && deferredLights.UseEID3336FiveMRT));
             if (providers == null || providers.Length == 0)
                 return;
-
             for (int i = 0; i < providers.Length; ++i)
             {
                 if (providers[i] is IEID3336URPGBufferProvider provider)
                 {
+                    Debug.Log("[EID3336 GBufferPass] provider=" + providers[i].GetType().FullName);
                     try
                     {
                         provider.RecordEID3336GBuffer(context, ref renderingData,
-                            m_DeferredLights.GbufferAttachments,
-                            m_DeferredLights.DepthAttachment);
+                            deferredLights.GbufferAttachments,
+                            deferredLights.DepthAttachment);
                     }
                     catch (System.Exception ex)
                     {
@@ -234,6 +240,12 @@ namespace UnityEngine.Rendering.Universal.Internal
 
             tagValues.Dispose();
             stateBlocks.Dispose();
+
+            // The independent EID3336 path is now a normal UniversalGBuffer
+            // material draw. Providers are used only as a readback bridge for
+            // validation; they must run after DrawRenderers so they cannot
+            // replace or overdraw the standard URP GBuffer result.
+            RecordEID3336Providers(context, ref renderingData, data.deferredLights);
 
             // Render objects that did not match any shader pass with error shader
             RenderingUtils.RenderObjectsWithError(context, ref renderingData.cullResults, renderingData.cameraData.camera, data.filteringSettings, SortingCriteria.None);
@@ -330,6 +342,10 @@ namespace UnityEngine.Rendering.Universal.Internal
         }
     }
 }
+
+
+
+
 
 
 

@@ -194,14 +194,16 @@ cbuffer VS_26_27
 // This is a storage buffer in the Vulkan capture, not a D3D constant buffer.
 StructuredBuffer<VS_29> VS_30_m0;
 
-// Unity replays the original instance-major draw as three ordered indexed draws.
-// The explicit index preserves gl_InstanceIndex 0/1/2 without relying on a
-// backend-specific instancing variant.
-// Route B uses ordinary MeshRenderer transforms for live scene rendering. The
-// remaining instance fields stay captured, while only the transform basis is
-// overridden per renderer through a MaterialPropertyBlock.
+// Exact RenderDoc replay: the instance record is read from the captured
+// buffer without replacing its transform with Unity's per-object matrix.
+// Live object/SceneView transform support is a separate later stage; mixing it
+// into the exact GBuffer path changes VS outputs and therefore FS inputs.
 VS_29 EID3336IndependentGetInstanceRecord()
 {
+    // Independent URP uses one DrawRenderer per scene node, so each draw has
+    // its own Unity object matrix. Keep captured non-transform fields from
+    // record 0 while applying the current renderer transform to both captured
+    // transform slots. The recovered VS arithmetic and PS/GBuffer are unchanged.
     VS_29 record = VS_30_m0[0u];
     record._m0 = UNITY_MATRIX_M;
     record._m3 = UNITY_MATRIX_M;

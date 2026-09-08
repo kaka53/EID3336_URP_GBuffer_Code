@@ -543,7 +543,11 @@ namespace UnityEngine.Rendering.Universal
                 var renderer = renderers[i];
                 if (renderer == null)
                     continue;
-                if (camera != null && renderer.gameObject.scene != camera.gameObject.scene)
+                // SceneView is an editor camera and its camera GameObject is not
+                // in the rendered scene. Do not reject scene renderers by comparing
+                // their scene handle with the editor camera's scene handle.
+                if (camera != null && camera.cameraType != CameraType.SceneView &&
+                    renderer.gameObject.scene != camera.gameObject.scene)
                     continue;
 
                 var materials = renderer.sharedMaterials;

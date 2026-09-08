@@ -21,10 +21,10 @@ Shader "Hidden/EID3332Combined/Deferred/B6CapturedIndirect"
         [Header(Indirect Lighting)]
         [Range(0,4)] _EID3336B6IndirectDiffuseStrength ("Indirect Diffuse Strength", Float) = 1
         [Range(0,4)] _EID3336B6IndirectSpecularStrength ("Indirect Specular Strength", Float) = 1
-        [Range(0,1)] _EID3336B6ScreenSHWeight ("Screen SH Weight", Float) = 0
-        [Range(0,1)] _EID3336B6ScreenSpecularContributionWeight ("Screen Specular Weight", Float) = 0
-        [Range(0,1)] _EID3336B6ProbeReflectionWeight ("Probe Reflection Weight", Float) = 0
-        [Range(0,1)] _EID3336B6CapturedVisibilityWeight ("Captured Visibility Weight", Float) = 0
+        [Range(0,1)] _EID3336B6ScreenSHWeight ("Screen SH Weight", Float) = 1
+        [Range(0,1)] _EID3336B6ScreenSpecularContributionWeight ("Screen Specular Weight", Float) = 1
+        [Range(0,1)] _EID3336B6ProbeReflectionWeight ("Probe Reflection Weight", Float) = 1
+        [Range(0,1)] _EID3336B6CapturedVisibilityWeight ("Captured Visibility Weight", Float) = 1
         _EID3336B6IndirectScale ("Captured Indirect Scale", Vector) = (1,1,1,1)
         _EID3336B6IndirectOptions ("Captured Indirect Options", Vector) = (1,1,1,1)
         _EID3336B6ReflectionMipParameters ("Reflection Mip Parameters", Vector) = (1,0,0,0)
@@ -83,4 +83,5 @@ Shader "Hidden/EID3332Combined/Deferred/B6CapturedIndirect"
     }
     Fallback Off
 }
+
 

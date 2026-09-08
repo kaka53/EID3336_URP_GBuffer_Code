@@ -1,8 +1,8 @@
 fileFormatVersion: 2
-guid: 18693667fb6b9904fab21d1b9d1536cc
+guid: $(uuidgen | tr -d '-' | cut -c1-32)
 folderAsset: yes
 DefaultImporter:
   externalObjects: {}
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
+  userData:
+  assetBundleName:
+  assetBundleVariant:

@@ -89,7 +89,8 @@ namespace UnityEngine.Rendering.Universal.Internal
                         gbufferAttachments,
                         lightingAttachment,
                         m_DeferredLights.DepthAttachment,
-                        m_DeferredLights.DepthCopyTexture);
+                        m_DeferredLights.DepthCopyTexture,
+                        m_DeferredLights.UseEID3336FiveMRT);
                 }
                 catch (System.Exception ex)
                 {
@@ -139,5 +140,7 @@ namespace UnityEngine.Rendering.Universal.Internal
         }
     }
 }
+
+
 
 

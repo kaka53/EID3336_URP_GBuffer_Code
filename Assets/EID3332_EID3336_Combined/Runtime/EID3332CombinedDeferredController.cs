@@ -61,10 +61,10 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
     public Texture2D b6ReflectionVisibility;
     public Texture2D b6SSAO;
     public Texture2DArray b6ReflectionAtlas;
-    [Range(0f, 1f)] public float b6ScreenSHWeight = 0f;
-    [Range(0f, 1f)] public float b6ScreenSpecularContributionWeight = 0f;
-    [Range(0f, 1f)] public float b6ProbeReflectionWeight = 0f;
-    [Range(0f, 1f)] public float b6CapturedVisibilityWeight = 0f;
+    [Range(0f, 1f)] public float b6ScreenSHWeight = 1f;
+    [Range(0f, 1f)] public float b6ScreenSpecularContributionWeight = 1f;
+    [Range(0f, 1f)] public float b6ProbeReflectionWeight = 1f;
+    [Range(0f, 1f)] public float b6CapturedVisibilityWeight = 1f;
 
     [Header("Camera/coordinates")]
     public ProjectionSource projectionSource = ProjectionSource.CurrentUnityCamera;
@@ -118,7 +118,7 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
 
     public bool IsForCamera(Camera camera)
     {
-        if (!isActiveAndEnabled || camera == null || targets == null) return false;
+        if (!isActiveAndEnabled || camera == null) return false;
         return camera == targetCamera || (renderInSceneView && camera.cameraType == CameraType.SceneView);
     }
 
@@ -350,14 +350,19 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
         RTHandle[] gbufferAttachments,
         RTHandle lightingAttachment,
         RTHandle depthAttachment,
-        RTHandle depthCopyTexture)
+        RTHandle depthCopyTexture,
+        bool sourceFiveMrt)
     {
         Camera camera = renderingData.cameraData.camera;
-        bool fiveMrt = UseEID3336FiveMRT(camera);
-        if ((!fiveMrt && !UsesRouteBMeshForCamera(camera)) || !enableB6Lighting ||
-            gbufferAttachments == null || gbufferAttachments.Length < (fiveMrt ? 6 : 3) ||
+        if (!IsForCamera(camera) || (!sourceFiveMrt && !UsesRouteBMeshForCamera(camera)) || !enableB6Lighting ||
+            gbufferAttachments == null || gbufferAttachments.Length < (sourceFiveMrt ? 5 : 3) ||
             lightingAttachment == null || depthAttachment == null)
             return false;
+
+        // Never substitute black textures for missing required live GBuffer inputs.
+        for (int i = 0; i < (sourceFiveMrt ? 5 : 3); ++i)
+            if (gbufferAttachments[i] == null || gbufferAttachments[i].rt == null)
+                return false;
 
         EnsureB6Material();
         if (b6LightingMaterial == null || b6LightingMaterial.shader == null ||
@@ -366,17 +371,20 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
 
         int width = Mathf.Max(1, renderingData.cameraData.cameraTargetDescriptor.width);
         int height = Mathf.Max(1, renderingData.cameraData.cameraTargetDescriptor.height);
-        BindDeferredLightingFromURPGBuffer(camera, gbufferAttachments, depthAttachment, depthCopyTexture, width, height);
+        BindDeferredLightingFromURPGBuffer(camera, gbufferAttachments, depthAttachment, depthCopyTexture, width, height, sourceFiveMrt);
 
         CommandBuffer cmd = CommandBufferPool.Get("EID3336 Route B URP Deferred Lighting");
         try
         {
+            // Lighting is a persistent URP attachment. Explicitly clear its color
+            // before the full-screen B6 draw so pixels not written by an invalid
+            // depth/GBuffer sample cannot retain the previous frame's lighting.
             cmd.SetRenderTarget(lightingAttachment.nameID, depthAttachment.nameID);
+            cmd.ClearRenderTarget(false, false, Color.clear);
             cmd.DrawProcedural(Matrix4x4.identity, b6LightingMaterial, 0,
                 MeshTopology.Triangles, 3, 1);
             context.ExecuteCommandBuffer(cmd);
-            Debug.Log("[EID3336 Route B] URP DeferredPass B6 lighting applied camera=" + camera.name +
-                " size=" + width + "x" + height);
+            LogDeferredInputContract(camera, sourceFiveMrt);
             return true;
         }
         finally
@@ -385,13 +393,33 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
         }
     }
 
+    // Log once per camera/layout, not every repaint (SceneView renders continuously).
+    readonly System.Collections.Generic.Dictionary<int, string> deferredInputContracts =
+        new System.Collections.Generic.Dictionary<int, string>();
+
+    void LogDeferredInputContract(Camera camera, bool sourceFiveMrt)
+    {
+        string contract = "fiveMrt=" + sourceFiveMrt +
+            " Material=" + b6LightingMaterial.GetFloat("_EID3336B6MaterialTarget") +
+            " Normal=" + b6LightingMaterial.GetFloat("_EID3336B6NormalTarget") +
+            " BaseColor=" + b6LightingMaterial.GetFloat("_EID3336B6BaseColorTarget") +
+            " RT3=" + b6LightingMaterial.GetTexture("_EID3336B6RT3")?.name +
+            " RT4=" + b6LightingMaterial.GetTexture("_EID3336B6RT4")?.name;
+        int id = camera.GetInstanceID();
+        if (deferredInputContracts.TryGetValue(id, out string previous) && previous == contract)
+            return;
+        deferredInputContracts[id] = contract;
+        Debug.Log("[EID3336 B6 Input Contract] camera=" + camera.name + " " + contract, this);
+    }
+
     void BindDeferredLightingFromURPGBuffer(
         Camera camera,
         RTHandle[] gbufferAttachments,
         RTHandle depthAttachment,
         RTHandle depthCopyTexture,
         int outputWidth,
-        int outputHeight)
+        int outputHeight,
+        bool sourceFiveMrt)
     {
         if (b6LightingMaterial == null || camera == null || gbufferAttachments == null ||
             gbufferAttachments.Length < 3 || depthAttachment == null)
@@ -400,10 +428,15 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
         // Live pipeline-owned resources. These must be refreshed for every camera.
         // In source five-MRT mode these are exactly RenderDoc RT0..RT4;
         // in compatibility mode they are the standard URP four-target inputs.
+        // Captured indirect-light textures and immutable RenderDoc constants are
+        // also rebound here every frame. Scalar tuning values (weights, view mode,
+        // direct-light controls) remain material-owned when b6MaterialOwnsTuningParameters
+        // is enabled.
+        BindCapturedLightingInputsToMaterial();
         b6LightingMaterial.SetTexture("_EID3336B6RT0", gbufferAttachments[0].rt);
         b6LightingMaterial.SetTexture("_EID3336B6RT1", gbufferAttachments[1].rt);
         b6LightingMaterial.SetTexture("_EID3336B6RT2", gbufferAttachments[2].rt);
-        if (UseEID3336FiveMRT(camera))
+        if (sourceFiveMrt)
         {
             b6LightingMaterial.SetTexture("_EID3336B6RT3", gbufferAttachments[3].rt);
             b6LightingMaterial.SetTexture("_EID3336B6RT4", gbufferAttachments[4].rt);
@@ -433,13 +466,12 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
         // The source five-MRT contract is a runtime routing decision, not a
         // material default. Always set the decoder targets here so a material
         // serialized for the legacy URP contract cannot silently remap RTs.
-        bool sourceFiveMrt = UseEID3336FiveMRT(camera);
+        if (!b6MaterialOwnsTuningParameters)
+            ApplyControllerB6TuningToMaterial();
         b6LightingMaterial.SetFloat("_EID3336B6UseURPGBuffer", sourceFiveMrt ? 0f : 1f);
         b6LightingMaterial.SetFloat("_EID3336B6MaterialTarget", sourceFiveMrt ? 2f : 1f);
         b6LightingMaterial.SetFloat("_EID3336B6NormalTarget", sourceFiveMrt ? 3f : 2f);
         b6LightingMaterial.SetFloat("_EID3336B6BaseColorTarget", sourceFiveMrt ? 4f : 0f);
-        if (!b6MaterialOwnsTuningParameters)
-            ApplyControllerB6TuningToMaterial();
         EnsureProbeBuffers();
     }
 
@@ -448,6 +480,7 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
         if (b6LightingMaterial == null || targets == null || camera == null) return;
 
         // Legacy five-MRT resources are also pipeline-owned/live.
+        BindCapturedLightingInputsToMaterial();
         for (int i = 0; i < 5; ++i)
             b6LightingMaterial.SetTexture("_EID3336B6RT" + i, targets.GetColor(i));
         b6LightingMaterial.SetTexture("_EID3336B6Depth", targets.Depth);
@@ -471,6 +504,29 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
             b6LightingMaterial.SetFloat("_EID3336B6NormalTarget", 3f);
             b6LightingMaterial.SetFloat("_EID3336B6BaseColorTarget", 4f);
         }
+        EnsureProbeBuffers();
+    }
+
+    // Captured textures and the RenderDoc constant/structured-buffer inputs are
+    // pipeline data, not per-object material tuning. Keep them synchronized with
+    // the active B6 material on every camera render so the full indirect-lighting
+    // path cannot silently fall back to black/default resources.
+    void BindCapturedLightingInputsToMaterial()
+    {
+        if (b6LightingMaterial == null) return;
+        LoadB6Assets();
+        if (b6ScreenSH != null) b6LightingMaterial.SetTexture("_EID3336B6ScreenSH", b6ScreenSH);
+        if (b6ScreenSpecularColor != null) b6LightingMaterial.SetTexture("_EID3336B6ScreenSpecularColor", b6ScreenSpecularColor);
+        if (b6ScreenSpecularWeight != null) b6LightingMaterial.SetTexture("_EID3336B6ScreenSpecularWeight", b6ScreenSpecularWeight);
+        if (b6ReflectionValidity != null) b6LightingMaterial.SetTexture("_EID3336B6ReflectionValidity", b6ReflectionValidity);
+        if (b6ReflectionVisibility != null) b6LightingMaterial.SetTexture("_EID3336B6ReflectionVisibility", b6ReflectionVisibility);
+        if (b6SSAO != null) b6LightingMaterial.SetTexture("_EID3336B6SSAO", b6SSAO);
+        if (b6ReflectionAtlas != null) b6LightingMaterial.SetTexture("_EID3336B6ReflectionAtlas", b6ReflectionAtlas);
+
+        // These values come from the captured deferred-lighting constant buffers.
+        // They are not replaced by Unity's standard URP lighting constants.
+        SetB6Constants();
+        ApplyProbeConstantsToMaterial();
         EnsureProbeBuffers();
     }
 
@@ -594,6 +650,9 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
     void ReleaseB6Buffers(){reflectionProbeBuffer?.Release();clusterMaskBuffer?.Release();reflectionProbeBuffer=null;clusterMaskBuffer=null;if(runtimeB6Material!=null){if(Application.isPlaying)Destroy(runtimeB6Material);else DestroyImmediate(runtimeB6Material);runtimeB6Material=null;}}
     public void SetLiveFinalTexture(Camera camera, RenderTexture texture){if(camera!=null){if(camera.cameraType==CameraType.SceneView)liveSceneViewFinalTexture=texture;else if(camera==targetCamera)liveGameFinalTexture=texture;}}
 }
+
+
+
 
 
 
