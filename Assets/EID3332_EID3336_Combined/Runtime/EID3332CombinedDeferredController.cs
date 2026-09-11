@@ -100,9 +100,9 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
     const string CapturedRoot = "Assets/EID3336_URP_Reconstruction/DeferredLightingReadable/CapturedResources";
     string ProjectFile(string assetPath) => Path.Combine(Directory.GetParent(Application.dataPath).FullName, assetPath.Replace('/', Path.DirectorySeparatorChar));
 
-    void OnEnable() { RefreshRenderers(); LoadB6Assets(); LoadCapturedMatrices(); EID3336LightingParameters.Register(this); }
-    void OnDisable() { EID3336LightingParameters.Unregister(this); ReleaseB6Buffers(); }
-    void OnDestroy() { EID3336LightingParameters.Unregister(this); ReleaseB6Buffers(); }
+    void OnEnable() { RefreshRenderers(); LoadB6Assets(); LoadCapturedMatrices(); EID3336LightingParameters.Register(this); EID3336URPGBufferProviderRegistry.Register(this); }
+    void OnDisable() { EID3336URPGBufferProviderRegistry.Unregister(this); EID3336LightingParameters.Unregister(this); ReleaseB6Buffers(); }
+    void OnDestroy() { EID3336URPGBufferProviderRegistry.Unregister(this); EID3336LightingParameters.Unregister(this); ReleaseB6Buffers(); }
     void OnValidate() { if (isActiveAndEnabled) RefreshRenderers(); }
 
     public bool UsesRouteBMeshForCamera(Camera camera)
