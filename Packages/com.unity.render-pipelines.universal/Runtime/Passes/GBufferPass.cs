@@ -29,6 +29,7 @@ namespace UnityEngine.Rendering.Universal.Internal
         RenderStateBlock m_RenderStateBlock;
         private PassData m_PassData;
 
+
         public GBufferPass(RenderPassEvent evt, RenderQueueRange renderQueueRange, LayerMask layerMask, StencilState stencilState, int stencilReference, DeferredLights deferredLights)
         {
             base.profilingSampler = new ProfilingSampler(nameof(GBufferPass));
@@ -183,25 +184,31 @@ namespace UnityEngine.Rendering.Universal.Internal
 
         static void RecordEID3336Providers(ScriptableRenderContext context, ref RenderingData renderingData, DeferredLights deferredLights)
         {
-            var providers = Object.FindObjectsOfType<MonoBehaviour>(true);
-            Debug.Log("[EID3336 GBufferPass] provider scan camera=" + (renderingData.cameraData.camera != null ? renderingData.cameraData.camera.name : "null") + " count=" + (providers != null ? providers.Length.ToString() : "0") + " five=" + (deferredLights != null && deferredLights.UseEID3336FiveMRT));
-            if (providers == null || providers.Length == 0)
+            if (deferredLights == null)
                 return;
-            for (int i = 0; i < providers.Length; ++i)
+
+            var providers = EID3336URPGBufferProviderRegistry.Providers;
+            for (int i = providers.Count - 1; i >= 0; --i)
             {
-                if (providers[i] is IEID3336URPGBufferProvider provider)
+                IEID3336URPGBufferProvider provider = providers[i];
+                MonoBehaviour behaviour = provider as MonoBehaviour;
+                if (provider == null || behaviour == null)
                 {
-                    Debug.Log("[EID3336 GBufferPass] provider=" + providers[i].GetType().FullName);
-                    try
-                    {
-                        provider.RecordEID3336GBuffer(context, ref renderingData,
-                            deferredLights.GbufferAttachments,
-                            deferredLights.DepthAttachment);
-                    }
-                    catch (System.Exception ex)
-                    {
-                        Debug.LogException(ex, providers[i]);
-                    }
+                    providers.RemoveAt(i);
+                    continue;
+                }
+                if (!behaviour.isActiveAndEnabled)
+                    continue;
+
+                try
+                {
+                    provider.RecordEID3336GBuffer(context, ref renderingData,
+                        deferredLights.GbufferAttachments,
+                        deferredLights.DepthAttachment);
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogException(ex, behaviour);
                 }
             }
         }

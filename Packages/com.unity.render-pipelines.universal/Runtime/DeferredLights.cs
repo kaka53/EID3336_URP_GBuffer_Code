@@ -634,7 +634,7 @@ namespace UnityEngine.Rendering.Universal.Internal
             CoreUtils.SetKeyword(cmd, ShaderKeywordStrings.LightCookies, m_LightCookieManager != null && m_LightCookieManager.IsKeywordLightCookieEnabled);
         }
 
-        static readonly ProfilingSampler s_EID3336LightPass = new ProfilingSampler("EID3336 Custom Deferred LightPass (5 GBuffer)");
+        static readonly ProfilingSampler s_EID3336LightPass = new ProfilingSampler("Custom Deferred LightPass (LegacyB6 / EID4662Full, 5 GBuffer)");
         readonly System.Collections.Generic.Dictionary<int, string> m_EID3336LightingErrors =
             new System.Collections.Generic.Dictionary<int, string>();
 
@@ -650,6 +650,7 @@ namespace UnityEngine.Rendering.Universal.Internal
             RTHandle[] inputs, RTHandle sampledDepth)
         {
             Camera camera = renderingData.cameraData.camera;
+            var cmd = renderingData.commandBuffer;
             if (inputs == null || inputs.Length < 5 || sampledDepth == null || sampledDepth.rt == null)
             {
                 ReportEID3336LightingError(camera, "Missing five GBuffer inputs or sampled depth. Check GBuffer/CopyDepth setup.");
@@ -661,35 +662,92 @@ namespace UnityEngine.Rendering.Universal.Internal
                     ReportEID3336LightingError(camera, "Missing GBuffer" + i);
                     return;
                 }
-            if (!EID3336LightingParameters.TryPrepare(camera, out var material) ||
-                material == null || material.shader == null || !material.shader.isSupported || material.passCount == 0)
+            if (!EID3336LightingParameters.TryPrepare(camera, out var material))
             {
-                ReportEID3336LightingError(camera, "No ready custom lighting material/parameters for this camera. Check camera assignment, B6 enable and shader compilation.");
+                ReportEID3336LightingError(camera, "No deferred-lighting provider accepted this camera. Check controller activation and LightPassMode.");
+                return;
+            }
+            if (material == null)
+            {
+                ReportEID3336LightingError(camera, "Deferred-lighting provider returned a null material.");
+                return;
+            }
+            if (material.shader == null)
+            {
+                ReportEID3336LightingError(camera, "Deferred-lighting material has no shader.");
+                return;
+            }
+            if (!material.shader.isSupported)
+            {
+                ReportEID3336LightingError(camera, "Deferred-lighting shader is unsupported on the active graphics API: " + material.shader.name + ".");
+                return;
+            }
+            if (material.passCount == 0)
+            {
+                ReportEID3336LightingError(camera, "Deferred-lighting shader has zero passes: " + material.shader.name + ".");
                 return;
             }
 
             // The five captured GBuffer textures are not UnityGBuffer's stock four-target layout.
-            for (int i = 0; i < 5; ++i) material.SetTexture("_EID3336B6RT" + i, inputs[i].rt);
-            material.SetTexture("_EID3336B6Depth", sampledDepth.rt);
-            material.SetFloat("_EID3336B6UseURPGBuffer", 0f);
-            material.SetFloat("_EID3336B6MaterialTarget", 2f);
-            material.SetFloat("_EID3336B6NormalTarget", 3f);
-            material.SetFloat("_EID3336B6BaseColorTarget", 4f);
-            // Match the existing GBuffer VS convention exactly; do not alter its transforms.
-            Matrix4x4 view = camera.worldToCameraMatrix;
-            Matrix4x4 worldToClip = GL.GetGPUProjectionMatrix(camera.projectionMatrix, true) * view;
-            material.SetMatrix("_EID3336B6ClipToWorld", worldToClip.inverse);
-            material.SetMatrix("_EID3336B6WorldToView", view);
-            material.SetVector("_EID3336B6CameraPositionWS", camera.transform.position);
-            int w = Mathf.Max(1, renderingData.cameraData.cameraTargetDescriptor.width);
-            int h = Mathf.Max(1, renderingData.cameraData.cameraTargetDescriptor.height);
-            material.SetVector("_EID3336B6ScreenSize", new Vector4(w, h, 1f / w, 1f / h));
-            material.SetVector("_EID3336B6OutputSize", new Vector4(w, h, 1f / w, 1f / h));
+            // Keep the legacy B6 contract intact, but route the isolated EID4662
+            // shader through its original resource names so the two light-pass
+            // implementations can be switched without changing GBuffer drawing.
+            bool useEID4662Full = material.shader != null &&
+                material.shader.name == "Hidden/EID3332Combined/Deferred/EID4662Full";
+
+            // EID4922 performs an explicit depth compare in its standalone sky pass.
+            // Publish the exact depth resource already consumed by EID4662 (_17),
+            // rather than relying on a possibly different hardware depth binding
+            // after the custom five-MRT deferred pass.
+            cmd.SetGlobalTexture("_EID4922SceneDepth", sampledDepth.rt);
+            cmd.SetGlobalFloat("_EID4922SceneDepthAvailable", 1f);
+            cmd.SetGlobalFloat("_EID4922SceneDepthReversedZ", SystemInfo.usesReversedZBuffer ? 1f : 0f);
+            cmd.SetGlobalFloat("_EID4922SceneDepthEpsilon", 1e-5f);
+
+            if (useEID4662Full)
+            {
+                material.SetTexture("_17", sampledDepth.rt);
+                material.SetTexture("_46", inputs[2].rt);
+                material.SetTexture("_47", inputs[3].rt);
+                material.SetTexture("_48", inputs[4].rt);
+            }
+            else
+            {
+                for (int i = 0; i < 5; ++i) material.SetTexture("_EID3336B6RT" + i, inputs[i].rt);
+                material.SetTexture("_EID3336B6Depth", sampledDepth.rt);
+                material.SetFloat("_EID3336B6UseURPGBuffer", 0f);
+                material.SetFloat("_EID3336B6MaterialTarget", 2f);
+                material.SetFloat("_EID3336B6NormalTarget", 3f);
+                material.SetFloat("_EID3336B6BaseColorTarget", 4f);
+            }
+            if (useEID4662Full)
+            {
+                int fullWidth = Mathf.Max(1, renderingData.cameraData.cameraTargetDescriptor.width);
+                int fullHeight = Mathf.Max(1, renderingData.cameraData.cameraTargetDescriptor.height);
+                Vector4 fullScreenSize = new Vector4(fullWidth, fullHeight, 1f / fullWidth, 1f / fullHeight);
+                material.SetVector("_EID4662OutputSize", fullScreenSize);
+                material.SetVector("_EID4662ScreenSize", fullScreenSize);
+                material.SetFloat("_EID4662ReversedZ", SystemInfo.usesReversedZBuffer ? 1f : 0f);
+                material.SetFloat("_EID4662DepthEpsilon", 1e-5f);
+            }
+            else
+            {
+                // Match the existing GBuffer VS convention exactly; do not alter its transforms.
+                Matrix4x4 view = camera.worldToCameraMatrix;
+                Matrix4x4 worldToClip = GL.GetGPUProjectionMatrix(camera.projectionMatrix, true) * view;
+                material.SetMatrix("_EID3336B6ClipToWorld", worldToClip.inverse);
+                material.SetMatrix("_EID3336B6WorldToView", view);
+                material.SetVector("_EID3336B6CameraPositionWS", camera.transform.position);
+                int w = Mathf.Max(1, renderingData.cameraData.cameraTargetDescriptor.width);
+                int h = Mathf.Max(1, renderingData.cameraData.cameraTargetDescriptor.height);
+                material.SetVector("_EID3336B6ScreenSize", new Vector4(w, h, 1f / w, 1f / h));
+                material.SetVector("_EID3336B6OutputSize", new Vector4(w, h, 1f / w, 1f / h));
+            }
 
             // DeferredPass declares CameraColor. No SetRenderTarget from scene code and no extra command buffer.
-            var cmd = renderingData.commandBuffer;
+            int lightPassIndex = useEID4662Full && material.GetFloat("_EID4662PreserveDestination") > 0.5f ? 1 : 0;
             using (new ProfilingScope(cmd, s_EID3336LightPass))
-                cmd.DrawProcedural(Matrix4x4.identity, material, 0, MeshTopology.Triangles, 3, 1);
+                cmd.DrawProcedural(Matrix4x4.identity, material, lightPassIndex, MeshTopology.Triangles, 3, 1);
             context.ExecuteCommandBuffer(cmd);
             cmd.Clear();
             m_EID3336LightingErrors.Remove(camera.GetInstanceID());

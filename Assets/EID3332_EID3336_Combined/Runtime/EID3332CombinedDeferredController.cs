@@ -42,9 +42,24 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
     public bool useURPFiveMRT = true;
     [NonSerialized] public RenderTexture[] lastURPGBufferCapture;
 
+    public enum LightPassMode { LegacyB6 = 0, EID4662Full = 1 }
+    [Header("Deferred light-pass selection")]
+    [Tooltip("LegacyB6 preserves the existing EID3336 B6 path. EID4662Full uses the isolated RenderDoc FS implementation and its own resources.")]
+    public LightPassMode lightPassMode = LightPassMode.LegacyB6;
+
     [Header("Shared B6 deferred lighting")]
     public bool enableB6Lighting = true;
     public Material b6LightingMaterial;
+    [Tooltip("Independent EID4662 full-FS light-pass material. Leave empty to create it from the isolated shader.")]
+    public Material eid4662FullLightingMaterial;
+    [Tooltip("Use captured Screen SH/specular/SSAO/mask resources while the Unity camera moves. Keep disabled to prevent previous-view ghosting; RenderDocCaptured mode always uses the captured resources.")]
+    public bool eid4662UseCapturedScreenSpaceInRealtime = false;
+    [Tooltip("Realtime EID4662 staged indirect-light mode. Start with DirectOnly, then enable IrradianceOnly, ReflectionOnly, and WorldIndirectAndFog one at a time.")]
+    public EID4662FullLightPassBinding.RealtimeIndirectMode eid4662RealtimeIndirectMode = EID4662FullLightPassBinding.RealtimeIndirectMode.CurrentCapturedResources;
+    [Tooltip("Diagnostic override for sampled deferred-light textures: leave unchanged, force sampled values to 0, or force them to 1.")]
+    public EID4662FullLightPassBinding.SampleTextureOverrideMode eid4662SampleTextureOverride = EID4662FullLightPassBinding.SampleTextureOverrideMode.Unchanged;
+    [Tooltip("Which EID4662 sampled-texture group receives the diagnostic override.")]
+    public EID4662FullLightPassBinding.SampleTextureOverrideScope eid4662SampleTextureOverrideScope = EID4662FullLightPassBinding.SampleTextureOverrideScope.ScreenSpace;
     [Tooltip("When enabled, adjustable lighting/profile values come from the B6 material inspector. The pipeline only supplies live GBuffer, depth, camera, screen and ComputeBuffer data.")]
     public bool b6MaterialOwnsTuningParameters = true;
 
@@ -93,6 +108,8 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
     readonly Dictionary<Renderer, int> profileByRenderer = new Dictionary<Renderer, int>();
     readonly Dictionary<Renderer, int> rendererIndex = new Dictionary<Renderer, int>();
     readonly Dictionary<int, Material> runtimeB6Materials = new Dictionary<int, Material>();
+    readonly Dictionary<int, Material> runtimeEID4662Materials = new Dictionary<int, Material>();
+    EID4662FullLightPassBinding eid4662FullBinding;
     ComputeBuffer reflectionProbeBuffer;
     ComputeBuffer clusterMaskBuffer;
     Material runtimeB6Material;
@@ -100,9 +117,9 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
     const string CapturedRoot = "Assets/EID3336_URP_Reconstruction/DeferredLightingReadable/CapturedResources";
     string ProjectFile(string assetPath) => Path.Combine(Directory.GetParent(Application.dataPath).FullName, assetPath.Replace('/', Path.DirectorySeparatorChar));
 
-    void OnEnable() { RefreshRenderers(); LoadB6Assets(); LoadCapturedMatrices(); EID3336LightingParameters.Register(this); }
-    void OnDisable() { EID3336LightingParameters.Unregister(this); ReleaseB6Buffers(); }
-    void OnDestroy() { EID3336LightingParameters.Unregister(this); ReleaseB6Buffers(); }
+    void OnEnable() { RefreshRenderers(); LoadB6Assets(); LoadCapturedMatrices(); if (eid4662FullBinding == null) eid4662FullBinding = new EID4662FullLightPassBinding(); EID3336LightingParameters.Register(this); EID3336URPGBufferProviderRegistry.Register(this); }
+    void OnDisable() { EID3336URPGBufferProviderRegistry.Unregister(this); EID3336LightingParameters.Unregister(this); ReleaseB6Buffers(); ReleaseEID4662Full(); }
+    void OnDestroy() { EID3336URPGBufferProviderRegistry.Unregister(this); EID3336LightingParameters.Unregister(this); ReleaseB6Buffers(); ReleaseEID4662Full(); }
     void OnValidate() { if (isActiveAndEnabled) RefreshRenderers(); }
 
     public bool UsesRouteBMeshForCamera(Camera camera)
@@ -155,6 +172,8 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
     public Material GetActiveDeferredLightingMaterial(Camera camera)
     {
         if (!enableB6Lighting) return null;
+        if (lightPassMode == LightPassMode.EID4662Full)
+            return GetActiveEID4662FullMaterial(camera);
         EnsureB6Material();
         if (b6LightingMaterial == null || b6LightingMaterial.shader == null) return null;
 
@@ -180,6 +199,51 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
             SyncB6TuningProperties(b6LightingMaterial, material);
         }
         return material;
+    }
+
+    Material GetActiveEID4662FullMaterial(Camera camera)
+    {
+        EnsureEID4662FullMaterial();
+        if (eid4662FullLightingMaterial == null || eid4662FullLightingMaterial.shader == null) return null;
+        int key = camera != null ? camera.GetInstanceID() : 0;
+        if (!runtimeEID4662Materials.TryGetValue(key, out Material material) || material == null ||
+            material.shader != eid4662FullLightingMaterial.shader)
+        {
+            DestroyRuntimeMaterial(material);
+            material = new Material(eid4662FullLightingMaterial)
+            {
+                name = "EID3332Combined EID4662 Full Runtime [" + (camera != null ? camera.name : "default") + "]",
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            runtimeEID4662Materials[key] = material;
+        }
+        return material;
+    }
+
+    void EnsureEID4662FullMaterial()
+    {
+        if (eid4662FullLightingMaterial != null) return;
+        Shader shader = Shader.Find("Hidden/EID3332Combined/Deferred/EID4662Full");
+        if (shader != null)
+            eid4662FullLightingMaterial = new Material(shader)
+            { name = "EID3332Combined EID4662 Full Runtime", hideFlags = HideFlags.HideAndDontSave };
+    }
+
+    void DestroyRuntimeMaterial(Material material)
+    {
+        if (material == null) return;
+        if (Application.isPlaying) Destroy(material); else DestroyImmediate(material);
+    }
+
+    void ReleaseEID4662Full()
+    {
+        foreach (Material material in runtimeEID4662Materials.Values) DestroyRuntimeMaterial(material);
+        runtimeEID4662Materials.Clear();
+        if (eid4662FullBinding != null) eid4662FullBinding.Release();
+        eid4662FullBinding = null;
+        if (eid4662FullLightingMaterial != null && eid4662FullLightingMaterial.hideFlags == HideFlags.HideAndDontSave)
+            DestroyRuntimeMaterial(eid4662FullLightingMaterial);
+        eid4662FullLightingMaterial = null;
     }
 
     static void SyncB6TuningProperties(Material source, Material target)
@@ -417,6 +481,29 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
         if (!IsForCamera(camera) || !enableB6Lighting) return false;
         material = GetActiveDeferredLightingMaterial(camera);
         if (material == null) return false;
+        if (lightPassMode == LightPassMode.EID4662Full)
+        {
+            if (eid4662FullBinding == null) eid4662FullBinding = new EID4662FullLightPassBinding();
+            bool useCapturedProjection = UseCapturedProjection(camera);
+            bool useCapturedScreenSpace = useCapturedProjection || eid4662UseCapturedScreenSpaceInRealtime;
+            eid4662FullBinding.Bind(material, useCapturedScreenSpace, eid4662RealtimeIndirectMode,
+                eid4662SampleTextureOverride, eid4662SampleTextureOverrideScope);
+            material.SetFloat("_EID4662UseLiveCamera", useCapturedProjection ? 0f : 1f);
+            // Live SceneView/Game output replaces the covered pixels. The
+            // captured replay path keeps RenderDoc's original destination blend.
+            material.SetFloat("_EID4662PreserveDestination", useCapturedProjection ? 1f : 0f);
+
+            // EID4662's captured CB contains the original camera. Replace only
+            // camera/screen-dependent values so SceneView and a moving Game
+            // camera reconstruct the current GBuffer in the same coordinate space.
+            Matrix4x4 view = GetWorldToView(camera);
+            Matrix4x4 worldToClip = GetViewProjection(camera);
+            material.SetMatrix("_EID4662WorldToView", view);
+            material.SetMatrix("_EID4662ClipToWorld", worldToClip.inverse);
+            Vector3 cameraPosition = GetCameraPosition(camera);
+            material.SetVector("_EID4662CameraPositionWS", new Vector4(cameraPosition.x, cameraPosition.y, cameraPosition.z, 1f));
+            return true;
+        }
         BindCapturedLightingInputsToMaterial(material);
         if (!b6MaterialOwnsTuningParameters) ApplyControllerB6TuningToMaterial(material);
         return true;
@@ -693,7 +780,7 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
         material.SetBuffer("_EID3336B6ReflectionProbes", reflectionProbeBuffer);
         material.SetBuffer("_EID3336B6ClusterProbeMasks", clusterMaskBuffer);
     }
-    void ReleaseB6Buffers(){reflectionProbeBuffer?.Release();clusterMaskBuffer?.Release();reflectionProbeBuffer=null;clusterMaskBuffer=null;if(runtimeB6Material!=null){if(Application.isPlaying)Destroy(runtimeB6Material);else DestroyImmediate(runtimeB6Material);runtimeB6Material=null;}}
+    void ReleaseB6Buffers(){reflectionProbeBuffer?.Release();clusterMaskBuffer?.Release();reflectionProbeBuffer=null;clusterMaskBuffer=null;foreach(var m in runtimeB6Materials.Values) DestroyRuntimeMaterial(m);runtimeB6Materials.Clear();if(runtimeB6Material!=null){if(Application.isPlaying)Destroy(runtimeB6Material);else DestroyImmediate(runtimeB6Material);runtimeB6Material=null;}}
     public void SetLiveFinalTexture(Camera camera, RenderTexture texture){if(camera!=null){if(camera.cameraType==CameraType.SceneView)liveSceneViewFinalTexture=texture;else if(camera==targetCamera)liveGameFinalTexture=texture;}}
 }
 

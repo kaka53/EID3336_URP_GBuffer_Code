@@ -82,7 +82,7 @@ CBUFFER_END
 struct EID3336IndependentAttributes
 {
     float3 position : POSITION;
-    float4 packedNormal : NORMAL;
+    float packedNormal : NORMAL;
     float4 tangent : TANGENT;
     float4 color : COLOR;
     float2 uv0 : TEXCOORD0;
@@ -90,7 +90,7 @@ struct EID3336IndependentAttributes
     float2 uv2 : TEXCOORD2;
     float4 uv3 : TEXCOORD3;
     float4 uv4 : TEXCOORD4;
-    float4 uv5 : TEXCOORD5;
+    uint4 uv5 : TEXCOORD5;
 };
 
 struct EID3336IndependentGBufferOutput
@@ -106,7 +106,7 @@ EID3336_VS_Output EID3336IndependentVertex(EID3336IndependentAttributes input)
 {
     EID3336_VS_Input v;
     v.VS_3 = input.position;
-    v.VS_4 = input.packedNormal.x;
+    v.VS_4 = input.packedNormal;
     v.VS_5 = input.tangent;
     v.VS_6 = input.color;
     v.VS_7 = input.uv0;
@@ -114,7 +114,7 @@ EID3336_VS_Output EID3336IndependentVertex(EID3336IndependentAttributes input)
     v.VS_9 = input.uv2;
     v.VS_10 = input.uv3;
     v.VS_11 = input.uv4;
-    v.VS_12 = (uint4)round(input.uv5);
+    v.VS_12 = input.uv5;
 
     // Optional material-local object-space adjustment. It is disabled by
     // default, leaving the Unity Transform as the source of world position.

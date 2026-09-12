@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
@@ -5,11 +6,8 @@ using UnityEngine.Rendering.Universal;
 namespace UnityEngine.Rendering.Universal
 {
     /// <summary>
-    /// Implemented by scene-side integrations that need to append recovered
-    /// RenderDoc geometry to the URP deferred GBuffer. The callback is invoked
-    /// from URP's real GBufferPass. A provider may request the source-level
-    /// five-MRT path, in which case stock UniversalGBuffer draws are skipped
-    /// and the provider owns RenderDoc RT0-RT4.
+    /// Implemented by scene-side integrations that append recovered RenderDoc
+    /// geometry to URP deferred GBuffer validation/integration paths.
     /// </summary>
     public interface IEID3336URPGBufferProvider
     {
@@ -19,5 +17,29 @@ namespace UnityEngine.Rendering.Universal
             ref RenderingData renderingData,
             RTHandle[] gbufferAttachments,
             RTHandle depthAttachment);
+    }
+
+    /// <summary>
+    /// Allocation-free provider registry used by GBufferPass. Providers register
+    /// only while enabled, avoiding FindObjectsOfType during SceneView repaint.
+    /// </summary>
+    public static class EID3336URPGBufferProviderRegistry
+    {
+        static readonly List<IEID3336URPGBufferProvider> s_Providers =
+            new List<IEID3336URPGBufferProvider>(4);
+
+        internal static List<IEID3336URPGBufferProvider> Providers => s_Providers;
+
+        public static void Register(IEID3336URPGBufferProvider provider)
+        {
+            if (provider != null && !s_Providers.Contains(provider))
+                s_Providers.Add(provider);
+        }
+
+        public static void Unregister(IEID3336URPGBufferProvider provider)
+        {
+            if (provider != null)
+                s_Providers.Remove(provider);
+        }
     }
 }

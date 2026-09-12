@@ -24,6 +24,10 @@ public static class EID3332CombinedSceneViewFinalizer
         if (camera == null || camera.cameraType != CameraType.SceneView) return;
         EID3332CombinedDeferredController controller = Object.FindObjectOfType<EID3332CombinedDeferredController>();
         if (controller == null || !controller.normalDeferredDisplay || !controller.renderInSceneView) return;
+        // EID4662Full is rendered directly by the modified URP DeferredPass.
+        // Do not run the legacy endCameraRendering Blit on SceneView, otherwise
+        // the native output is composited a second time from a stale final RT.
+        if (controller.lightPassMode == EID3332CombinedDeferredController.LightPassMode.EID4662Full) return;
         RenderTexture source = controller.liveSceneViewFinalTexture;
         RenderTexture destination = camera.targetTexture;
         Material composite = controller.cameraCompositeMaterial;
