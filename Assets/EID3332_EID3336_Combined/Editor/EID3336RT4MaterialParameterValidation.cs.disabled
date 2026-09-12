@@ -1,0 +1,181 @@
+#if UNITY_EDITOR
+using System;
+using System.IO;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+using UnityEngine.Rendering;
+
+/// <summary>
+/// Validates the real per-GameObject parameter path. RT4 must stay the direct
+/// PS209987._16 output; the test changes one object's shader switch and checks
+/// that the corresponding draw changes without editing a material property.
+/// </summary>
+public static class EID3336RT4MaterialParameterValidation
+{
+    const string ScenePath = "Assets/EID3332_EID3336_Combined/Scenes/EID3332_EID3336_Combined.unity";
+    const string OutputRelative = "Assets/EID3332_EID3336_Combined/Validation/RT4_PerObject_Parameter_Check";
+
+    [MenuItem("Tools/EID3332+3336/Validate Per-GameObject GBuffer Parameters")]
+    public static void Run()
+    {
+        Scene scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+        if (!scene.IsValid()) throw new InvalidOperationException("Unable to open combined scene.");
+        var controller = UnityEngine.Object.FindObjectOfType<EID3332CombinedDeferredController>(true);
+        EID3336PerObjectParameterSetup.InstallActiveScene();
+        var fallback = UnityEngine.Object.FindObjectOfType<EID3336RT4ParameterController>(true);
+        var objects = UnityEngine.Object.FindObjectsOfType<EID3336GBufferObjectParameters>(true);
+        if (controller == null || controller.targetCamera == null || controller.sharedMrtController == null)
+            throw new InvalidOperationException("Combined deferred controller is incomplete.");
+        if (fallback == null) throw new InvalidOperationException("Fallback parameter controller is not mounted.");
+        if (objects == null || objects.Length == 0)
+            throw new InvalidOperationException("No EID3336GBufferObjectParameters are mounted on model GameObjects.");
+        controller.sharedMrtController.parameterController = fallback;
+        controller.sharedMrtController.logDrawBindings = true;
+
+        EID3336GBufferObjectParameters target = null;
+        foreach (var item in objects)
+        {
+            if (item == null || item.eventId != 3336) continue;
+            // Prefer the component mounted on the actual rendered instance,
+            // not the profile root. The controller resolves renderer-local
+            // parameters first, so the validation must edit that same object.
+            if (item.GetComponent<Renderer>() != null)
+            {
+                target = item;
+                break;
+            }
+        }
+        if (target == null)
+            foreach (var item in objects)
+                if (item != null && item.eventId == 3336) { target = item; break; }
+        if (target == null) throw new InvalidOperationException("No per-object EID3336 parameter component was found.");
+
+        if (controller.eid3315Root != null) controller.eid3315Root.gameObject.SetActive(false);
+        if (controller.eid3332Root != null) controller.eid3332Root.gameObject.SetActive(false);
+        if (controller.eid3336Root != null) controller.eid3336Root.gameObject.SetActive(true);
+        controller.projectionSource = EID3332CombinedDeferredController.ProjectionSource.RenderDocCaptured;
+        controller.useURPFiveMRT = true;
+        controller.useRouteBMeshRendererForCurrentCamera = false;
+        controller.captureURPGBufferForValidation = true;
+        controller.enableB6Lighting = false;
+
+        bool oldFlip = target.flipMaterialUvY;
+        Texture2D validationBaseColor = BuildSolidTexture(new Color(1f, 0.02f, 0.02f, 1f), "EID3336 validation red");
+        if (validationBaseColor == null)
+            throw new InvalidOperationException("Unable to create validation BaseColor texture.");
+        Renderer targetRenderer = target.GetComponent<Renderer>();
+        Renderer[] allSceneRenderers = controller.sharedMrtController.GetAllRenderers();
+        var oldRendererEnabled = new bool[allSceneRenderers.Length];
+        for (int i = 0; i < allSceneRenderers.Length; ++i)
+        {
+            oldRendererEnabled[i] = allSceneRenderers[i] != null && allSceneRenderers[i].enabled;
+            if (allSceneRenderers[i] != null && allSceneRenderers[i] != targetRenderer)
+                allSceneRenderers[i].enabled = false;
+        }
+        RenderTexture oldTarget = controller.targetCamera.targetTexture;
+        RenderTexture renderTarget = new RenderTexture(1366, 768, 24, RenderTextureFormat.ARGB32)
+        {
+            name = "EID3336 per-object parameter validation target",
+            hideFlags = HideFlags.DontSave
+        };
+        renderTarget.Create();
+        controller.targetCamera.enabled = false;
+        controller.targetCamera.targetTexture = renderTarget;
+
+        try
+        {
+            string output = Path.Combine(ProjectRoot(), OutputRelative.Replace('/', Path.DirectorySeparatorChar));
+            Directory.CreateDirectory(output);
+
+            target.SetRenderDocDefaults(3336);
+            controller.targetCamera.Render();
+            SaveCapture(controller, output, "RT4_Default");
+            byte[] baseline = ReadLastRT4(controller);
+
+            // Change only the selected model GameObject. The controller records
+            // this component's value before that object's DrawProcedural call.
+            target.SetValidationBaseColor(validationBaseColor);
+            controller.targetCamera.Render();
+            SaveCapture(controller, output, "RT4_PerObjectChanged");
+            byte[] changed = ReadLastRT4(controller);
+
+            int different = CountDifferent(baseline, changed);
+            File.WriteAllText(Path.Combine(output, "report.txt"),
+                "projection=RenderDocCaptured\n" +
+                "resolution=1366x768\n" +
+                "source=EID3336GBufferObjectParameters\n" +
+                "shaderOutput=PS209987._16\n" +
+                "targetObject=" + target.name + "\n" +
+                "profileEvent=3336\n" +
+                "changedParameter=perObjectBaseColorTexture\n" +
+                "differentRT4Bytes=" + different + "\n" +
+                "result=" + (different > 0 ? "PASS" : "FAIL") + "\n");
+            if (different <= 0)
+                throw new InvalidOperationException("Per-GameObject parameter did not change the EID3336 draw output.");
+            Debug.Log("[EID3336 Per-Object GBuffer Validation] PASS: changed bytes=" + different + " output=" + output);
+        }
+        finally
+        {
+            target.ClearValidationBaseColor();
+            target.SetFlipMaterialUvY(oldFlip);
+            for (int i = 0; i < allSceneRenderers.Length; ++i)
+                if (allSceneRenderers[i] != null) allSceneRenderers[i].enabled = oldRendererEnabled[i];
+            if (validationBaseColor != null) UnityEngine.Object.DestroyImmediate(validationBaseColor);
+            controller.sharedMrtController.logDrawBindings = false;
+            controller.targetCamera.targetTexture = oldTarget;
+            controller.captureURPGBufferForValidation = false;
+            controller.ReleaseURPGBufferValidationCapture();
+            renderTarget.Release();
+            UnityEngine.Object.DestroyImmediate(renderTarget);
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+        }
+    }
+
+    static byte[] ReadLastRT4(EID3332CombinedDeferredController controller)
+    {
+        if (controller.lastURPGBufferCapture == null || controller.lastURPGBufferCapture.Length <= 4 || controller.lastURPGBufferCapture[4] == null)
+            throw new InvalidOperationException("RT4 validation capture was not produced.");
+        var request = AsyncGPUReadback.Request(controller.lastURPGBufferCapture[4]);
+        request.WaitForCompletion();
+        if (request.hasError) throw new InvalidOperationException("RT4 AsyncGPUReadback failed.");
+        return request.GetData<byte>().ToArray();
+    }
+
+    static int CountDifferent(byte[] a, byte[] b)
+    {
+        if (a == null || b == null || a.Length != b.Length) return -1;
+        int n = 0;
+        for (int i = 0; i < a.Length; ++i) if (a[i] != b[i]) n++;
+        return n;
+    }
+
+    static void SaveCapture(EID3332CombinedDeferredController controller, string output, string label)
+    {
+        var rt = controller.lastURPGBufferCapture[4];
+        RenderTexture old = RenderTexture.active;
+        RenderTexture.active = rt;
+        var image = new Texture2D(rt.width, rt.height, TextureFormat.RGBA32, false, true);
+        image.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0, false);
+        image.Apply(false, false);
+        File.WriteAllBytes(Path.Combine(output, label + ".png"), image.EncodeToPNG());
+        UnityEngine.Object.DestroyImmediate(image);
+        RenderTexture.active = old;
+    }
+
+    static Texture2D BuildSolidTexture(Color color, string name)
+    {
+        var texture = new Texture2D(2, 2, TextureFormat.RGBA32, false, true) { name = name, hideFlags = HideFlags.DontSave };
+        texture.SetPixels(new[] { color, color, color, color });
+        texture.Apply(false, false);
+        texture.wrapMode = TextureWrapMode.Clamp;
+        texture.filterMode = FilterMode.Point;
+        return texture;
+    }
+
+    static string ProjectRoot() => Directory.GetParent(Application.dataPath).FullName;
+}
+#endif

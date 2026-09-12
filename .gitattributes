@@ -1,0 +1,10 @@
+# Source files
+*.cs       text eol=lf
+*.hlsl     text eol=lf
+*.shader   text eol=lf
+*.asmdef   text eol=lf
+*.asmref   text eol=lf
+*.spvasm   text eol=lf
+*.json     text eol=lf
+*.meta     text eol=lf
+*.txt      text eol=lf

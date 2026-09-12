@@ -1,0 +1,26 @@
+{
+  "eventId": 3336,
+  "vertexCount": 1716,
+  "indexCount": 7980,
+  "instanceCount": 3,
+  "source": "CapturedResources/EID3336/Raw",
+  "modelAsset": "EID3336_VSInput_Exact.asset",
+  "prefab": "EID3336_VSInput_Exact.prefab",
+  "inputLayout": {
+    "POSITION": "float3 stream0 offset 0 stride 16",
+    "NORMAL": "float scalar, raw bits stream0 offset 12 stride 16",
+    "TANGENT": "UNORM8 constant stream offset 12",
+    "COLOR": "UNORM8 constant stream offset 4",
+    "TEXCOORD0": "float2 stream1 offset 0 stride 16",
+    "TEXCOORD1": "float2 stream1 offset 8 stride 16",
+    "TEXCOORD2": "alias TEXCOORD1",
+    "TEXCOORD3": "float4(TEXCOORD1.xy,0,1)",
+    "TEXCOORD4": "UNORM8 constant stream offset 16",
+    "TEXCOORD5": "uint4(constant offset 0,0,0,0)"
+  },
+  "coordinateSpace": "captured VS input object space; instance matrices remain on prefab nodes",
+  "rawPreservation": {
+    "uv6": "NORMAL scalar bit pattern as float",
+    "uv7": "TEXCOORD5 uint x as numeric float"
+  }
+}

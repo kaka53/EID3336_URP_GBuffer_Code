@@ -1,0 +1,128 @@
+{
+  "eid": 3315,
+  "draw": "vkCmdDrawIndexed(23853, 1)",
+  "indexed": true,
+  "index_fallback": false,
+  "num_indices": 23853,
+  "num_instances": 1,
+  "instance_offset": 0,
+  "base_vertex": 0,
+  "index_offset": 0,
+  "stage": "VSOut",
+  "view": 0,
+  "coordinate_profile": {
+    "name": "endfield_vulkan_main_camera",
+    "camera_cb_byte_offset": 369408,
+    "aux_cb_byte_offset": 370944,
+    "camera_matrix_inner_offset": 512,
+    "camera_origin_inner_offset": 704,
+    "projection_jitter_inner_offset": 304,
+    "projection_jitter": [
+      -0.125,
+      -0.2777777910232544,
+      -9.15080527192913e-05,
+      -0.00036168983206152916
+    ],
+    "camera_origin": [
+      -560.8156127929688,
+      108.86643981933594,
+      -410.7920227050781
+    ]
+  },
+  "coordinate_space": "world",
+  "fbx_axis": "Y-up, -Z front, X right",
+  "fbx_unit_scale": "meter",
+  "attribute_mapping": {
+    "uv0": "_output0",
+    "uv2": "_output1",
+    "normal": "_output3",
+    "tangent": "_output4",
+    "color": "_output2"
+  },
+  "postvs_reflected_stride": 112,
+  "postvs_output_layout": [
+    {
+      "name": "_Position",
+      "offset": 0,
+      "components": 4,
+      "reg_index": 0,
+      "system_value": "ShaderBuiltin.Position"
+    },
+    {
+      "name": "_output0",
+      "offset": 16,
+      "components": 2,
+      "reg_index": 0,
+      "system_value": "ShaderBuiltin.Undefined"
+    },
+    {
+      "name": "_output1",
+      "offset": 24,
+      "components": 2,
+      "reg_index": 1,
+      "system_value": "ShaderBuiltin.Undefined"
+    },
+    {
+      "name": "_output2",
+      "offset": 32,
+      "components": 2,
+      "reg_index": 2,
+      "system_value": "ShaderBuiltin.Undefined"
+    },
+    {
+      "name": "_output3",
+      "offset": 48,
+      "components": 3,
+      "reg_index": 3,
+      "system_value": "ShaderBuiltin.Undefined"
+    },
+    {
+      "name": "_output4",
+      "offset": 64,
+      "components": 4,
+      "reg_index": 4,
+      "system_value": "ShaderBuiltin.Undefined"
+    },
+    {
+      "name": "_output6",
+      "offset": 80,
+      "components": 3,
+      "reg_index": 6,
+      "system_value": "ShaderBuiltin.Undefined"
+    },
+    {
+      "name": "_output7",
+      "offset": 96,
+      "components": 3,
+      "reg_index": 7,
+      "system_value": "ShaderBuiltin.Undefined"
+    },
+    {
+      "name": "_output8",
+      "offset": 108,
+      "components": 1,
+      "reg_index": 8,
+      "system_value": "ShaderBuiltin.Undefined"
+    }
+  ],
+  "total_vertices": 4766,
+  "total_triangles": 7951,
+  "fbx_mesh_nodes": 1,
+  "bbox": {
+    "min": [
+      -560.0863370976654,
+      94.83018619498601,
+      -430.3333585403957
+    ],
+    "max": [
+      -551.612123884404,
+      107.98631873267163,
+      -415.5439651950459
+    ]
+  },
+  "outputs": {
+    "fbx": "D:\\endcopy\\endcopy\\Assets\\EndMode\\eid_3315_world.fbx",
+    "instances_csv": "D:\\endcopy\\endcopy\\Assets\\EndMode\\eid_3315_world_instances.csv",
+    "summary": "D:\\endcopy\\endcopy\\Assets\\EndMode\\eid_3315_world_export.json"
+  }
+}

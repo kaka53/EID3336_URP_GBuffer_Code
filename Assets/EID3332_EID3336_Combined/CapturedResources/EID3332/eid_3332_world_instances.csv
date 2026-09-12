@@ -1,0 +1,2 @@
+﻿eid,instance,shader_instance_id,vertex_count,index_count,triangle_count,vertex_stride,index_stride,topology,bbox_min_x,bbox_min_y,bbox_min_z,bbox_max_x,bbox_max_y,bbox_max_z
+3332,0,0,829,4791,1597,112,2,Topology.TriangleList,-556.3994814800153,103.34030806250585,-412.8432503703277,-544.1939759457979,107.7738122715117,-397.32595610564334

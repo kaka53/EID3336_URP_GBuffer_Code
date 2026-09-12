@@ -1,0 +1,171 @@
+{
+  "eventId": 3490,
+  "capture": "F:/endfield06.rdc",
+  "vs": "209988",
+  "ps": "209989",
+  "sourceBuffer": "201089",
+  "auxBuffer": "155",
+  "indexCount": 1422,
+  "instanceCount": 3,
+  "maxIndex": 323,
+  "vertexCount": 324,
+  "vb0": {
+    "offset": 14852864,
+    "stride": 16
+  },
+  "vb1": {
+    "offset": 14858048,
+    "stride": 16
+  },
+  "ib": {
+    "offset": 14863232,
+    "stride": 2
+  },
+  "rawFiles": {
+    "vertex_stream0": 5184,
+    "vertex_stream1": 5184,
+    "vertex_constant_stream": 20,
+    "indices_u16": 2844
+  },
+  "vertexInputs": [
+    {
+      "name": "_input0",
+      "vb": 0,
+      "offset": 0,
+      "perInstance": false,
+      "rate": 1,
+      "format": "R32G32B32_FLOAT"
+    },
+    {
+      "name": "_input1",
+      "vb": 0,
+      "offset": 12,
+      "perInstance": false,
+      "rate": 1,
+      "format": "R32_FLOAT"
+    },
+    {
+      "name": "_input2",
+      "vb": 3,
+      "offset": 12,
+      "perInstance": false,
+      "rate": 1,
+      "format": "R8G8B8A8_UNORM"
+    },
+    {
+      "name": "_input3",
+      "vb": 3,
+      "offset": 4,
+      "perInstance": false,
+      "rate": 1,
+      "format": "R8G8B8A8_UNORM"
+    },
+    {
+      "name": "_input4",
+      "vb": 1,
+      "offset": 0,
+      "perInstance": false,
+      "rate": 1,
+      "format": "R32G32_FLOAT"
+    },
+    {
+      "name": "_input5",
+      "vb": 1,
+      "offset": 8,
+      "perInstance": false,
+      "rate": 1,
+      "format": "R32G32_FLOAT"
+    },
+    {
+      "name": "_input6",
+      "vb": 1,
+      "offset": 8,
+      "perInstance": false,
+      "rate": 1,
+      "format": "R32G32_FLOAT"
+    },
+    {
+      "name": "_input7",
+      "vb": 1,
+      "offset": 8,
+      "perInstance": false,
+      "rate": 1,
+      "format": "R32G32_FLOAT"
+    },
+    {
+      "name": "_input8",
+      "vb": 3,
+      "offset": 16,
+      "perInstance": false,
+      "rate": 1,
+      "format": "R8G8B8A8_UNORM"
+    },
+    {
+      "name": "_input9",
+      "vb": 3,
+      "offset": 0,
+      "perInstance": false,
+      "rate": 1,
+      "format": "R8G8B8A8_UINT"
+    }
+  ],
+  "vsCB": [
+    {
+      "resource": "ResourceId::526",
+      "offset": 369408,
+      "size": 1312
+    },
+    {
+      "resource": "ResourceId::526",
+      "offset": 370944,
+      "size": 3200
+    },
+    {
+      "resource": "ResourceId::526",
+      "offset": 3792128,
+      "size": 65536
+    }
+  ],
+  "psCB": [
+    {
+      "resource": "ResourceId::526",
+      "offset": 369408,
+      "size": 1312
+    },
+    {
+      "resource": "ResourceId::198430",
+      "offset": 0,
+      "size": 7168
+    },
+    {
+      "resource": "ResourceId::526",
+      "offset": 370944,
+      "size": 3200
+    },
+    {
+      "resource": "ResourceId::198427",
+      "offset": 0,
+      "size": 208
+    },
+    {
+      "resource": "ResourceId::526",
+      "offset": 567040,
+      "size": 17456
+    },
+    {
+      "resource": "ResourceId::526",
+      "offset": 543232,
+      "size": 16
+    },
+    {
+      "resource": "ResourceId::603",
+      "offset": 828928,
+      "size": 720
+    },
+    {
+      "resource": "ResourceId::526",
+      "offset": 3792128,
+      "size": 65536
+    }
+  ]
+}
