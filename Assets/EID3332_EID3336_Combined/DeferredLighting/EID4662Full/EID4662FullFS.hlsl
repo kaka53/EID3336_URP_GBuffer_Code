@@ -386,9 +386,13 @@ void frag_main()
     float3 _455 = (_430 * _447) + _452.xxx;
     float _456 = _447 + _452;
     float4 _469 = _29.Load(int3(_301, 0));
-    float _470 = _469.x;
+    float _470Raw = saturate(_469.x);
+    // _29 validity can be overridden without replacing the captured texture.
+    // Defaults (weight=0, threshold=0.001) preserve the RenderDoc algorithm.
+    float _470 = saturate(lerp(_470Raw, saturate(_EID4662Res29LerpValue), saturate(_EID4662Res29LerpWeight)));
+    float _470Threshold = max(0.0f, _EID4662Res29Threshold);
     float4 _606;
-    if (_470 > 0.001000000047497451305389404296875f)
+    if (_470 > _470Threshold)
     {
         float3 _480 = reflect(_390, _332);
         float3 _481 = -_28_m0.xyz;
@@ -411,7 +415,11 @@ void frag_main()
         float _572 = 1.0f - _571;
         float3 _575 = _430 + ((1.0f.xxx - _430) * 0.0476190485060214996337890625f);
         float3 _591 = ((clamp((min(((_430 * (1.0f - _540)) + _540.xxx) * ((_440 / (_534 * _534)) * (0.5f / (((_508 * sqrt(((((-_513) * _440) + _513) * _513) + _440)) + (_513 * sqrt(((((-_508) * _440) + _508) * _508) + _440))) + 9.9999997473787516355514526367188e-05f))), 2048.0f.xxx) + (((_575 * (((_32.SampleLevel(sampler_LinearClamp, (float2(_513, _422) * 0.96875f) + 0.015625f.xx, 0.0f).x * _32.SampleLevel(sampler_LinearClamp, (float2(_508, _422) * 0.96875f) + 0.015625f.xx, 0.0f).x) * _571) / _572)) * _575) / (1.0f.xxx - (_575 * _572)))) * _28_m4.x, 0.0f.xxx, 1000.0f.xxx) * _508) + ((_426 * 1.0f) * _508)) * _28_m1.xyz;
-        float3 _604 = lerp(_591, _591 * _30.SampleBias(sampler_LinearClamp, float2(_470, 0.5f), _9_m16).xyz, (1.0f - _470).xxx) * min(_33.SampleLevel(sampler_LinearClamp, _350, 0.0f).x, 1.0f);
+        float _33Raw = saturate(_33.SampleLevel(sampler_LinearClamp, _350, 0.0f).x);
+        float _33Value = saturate(lerp(_33Raw, saturate(_EID4662Res33LerpValue), saturate(_EID4662Res33LerpWeight)));
+        float _33Threshold = max(0.0f, _EID4662Res33Threshold);
+        float _33Visibility = (_33Value >= _33Threshold) ? _33Value : 0.0f;
+        float3 _604 = lerp(_591, _591 * _30.SampleBias(sampler_LinearClamp, float2(_470, 0.5f), _9_m16).xyz, (1.0f - _470).xxx) * _33Visibility.xxx;
         _606 = float4(_604.x, _604.y, _604.z, 0.0f.xxxx.w);
     }
     else
@@ -734,7 +742,10 @@ void frag_main()
     {
         float4 _1542 = _19.SampleBias(sampler_LinearClamp, _4, _9_m16);
         float _1543 = _1542.x;
-        _1548 = (_18.SampleBias(sampler_LinearClamp, _4, _9_m16).xyz * _1543) + (_1525 * (1.0f - _1543));
+        float3 _18Raw = _18.SampleBias(sampler_LinearClamp, _4, _9_m16).xyz;
+        float _18Weight = saturate(_EID4662Res18LerpWeight);
+        float3 _18Value = lerp(_18Raw, _EID4662Res18LerpValue.xxx, _18Weight);
+        _1548 = (_18Value * _1543) + (_1525 * (1.0f - _1543));
     }
     else
     {

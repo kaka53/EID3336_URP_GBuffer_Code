@@ -44,6 +44,9 @@ public static class EID3315CombinedImporter
             material.shader = shader;
             material.name = "EID3315 Profile - Shared VS209986 PS209987";
         }
+        CopyTextureTable(material, textureSource);
+        material.SetFloat("_EID3336RawStream1StrideBytes", 8f);
+        material.SetFloat("_EID3332CombinedEnableVirtualTextureBranch", 0f);
 
         EID3332CombinedDrawProfile profile = AssetDatabase.LoadAssetAtPath<EID3332CombinedDrawProfile>(ProfilePath);
         if (profile == null)
@@ -294,6 +297,25 @@ public static class EID3315CombinedImporter
         RenderTexture.ReleaseTemporary(staging);
         return nonBlack;
     }
+    static void CopyTextureTable(Material material, Material textureSource)
+    {
+        if (material == null || textureSource == null) return;
+        string[] slots = {"_33","_35","_37","_38","_39","_40","_41","_42","_53","_54","_55","_56","_57","_58","_59","_60","_61","_62","_63","_64","_65"};
+        for (int i = 0; i < slots.Length; ++i)
+        {
+            if (!material.HasProperty(slots[i])) continue;
+            Texture texture = textureSource.GetTexture(slots[i]);
+            if (texture == null) throw new InvalidOperationException("EID3315 texture table is missing " + slots[i]);
+            material.SetTexture(slots[i], texture);
+        }
+        if (material.GetTexture("_35") == null || !AssetDatabase.GetAssetPath(material.GetTexture("_35")).Contains("rid198537"))
+            throw new InvalidOperationException("EID3315 unique _35 must stay on RID198537.");
+        if (material.GetTexture("_37") == null || !AssetDatabase.GetAssetPath(material.GetTexture("_37")).Contains("rid227514"))
+            throw new InvalidOperationException("EID3315 unique _37 must stay on RID227514.");
+        if (material.GetTexture("_39") == null || !AssetDatabase.GetAssetPath(material.GetTexture("_39")).Contains("rid198541"))
+            throw new InvalidOperationException("EID3315 unique _39 must stay on RID198541.");
+    }
+
     static void ConfigureModelImporter()
     {
         ModelImporter importer = AssetImporter.GetAtPath(ModelPath) as ModelImporter;

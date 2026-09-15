@@ -127,8 +127,8 @@ public static class ColourPass6VS209988PS209989BatchImporter
         if (p.files == null || p.files.indices == null || string.IsNullOrEmpty(p.files.indices.file)) throw new InvalidDataException("EID" + p.eid + " index file missing.");
         if (p.streams == null || p.streams.Length == 0) throw new InvalidDataException("EID" + p.eid + " streams missing.");
         foreach (StreamRef s in p.streams) if (s.file == null || !File.Exists(Absolute(Root + "/" + s.file.file))) throw new FileNotFoundException("EID" + p.eid + " stream missing: slot " + s.slot);
-        if (Rid(p, "res33") == 0 || Rid(p, "res35") == 0 || Rid(p, "res37") == 0 || Rid(p, "res38") == 0)
-            throw new InvalidDataException("EID" + p.eid + " missing material slots res33/res35/res37/res38.");
+        if (Rid(p, "res33") == 0 || Rid(p, "res35") == 0 || Rid(p, "res37") == 0 || Rid(p, "res38") == 0 || Rid(p, "res39") == 0 || Rid(p, "res40") == 0 || Rid(p, "res41") == 0)
+            throw new InvalidDataException("EID" + p.eid + " missing material slots res33/res35/res37/res38/res39/res40/res41.");
         byte[] local = ReadCB(p, "PS", "uniforms43");
         if (local.Length < 720) throw new InvalidDataException("EID" + p.eid + " PS uniforms43 expected 720 bytes, got " + local.Length);
         byte[] inst = ReadCB(p, "VS", "uniforms30");
@@ -233,14 +233,20 @@ public static class ColourPass6VS209988PS209989BatchImporter
         Texture normalTex = LoadTexture(p, "res35");
         Texture overlayTex = LoadTexture(p, "res37");
         Texture detailN = LoadTexture(p, "res38");
-        if (albedo == null || normalTex == null || overlayTex == null || detailN == null)
-            throw new FileNotFoundException("EID" + p.eid + " res33/res35/res37/res38 texture binding is incomplete.");
+        Texture extraMask = LoadTexture(p, "res39");
+        Texture extraColor = LoadTexture(p, "res40");
+        Texture extraNormal = LoadTexture(p, "res41");
+        if (albedo == null || normalTex == null || overlayTex == null || detailN == null || extraMask == null || extraColor == null || extraNormal == null)
+            throw new FileNotFoundException("EID" + p.eid + " res33/res35/res37/res38/res39/res40/res41 texture binding is incomplete.");
         m.SetTexture("_Res33", albedo);
         m.SetTexture("_Res35", normalTex);
         m.SetTexture("_Res37", overlayTex);
         m.SetTexture("_Res38", detailN);
+        m.SetTexture("_Res39", extraMask);
+        m.SetTexture("_Res40", extraColor);
+        m.SetTexture("_Res41", extraNormal);
         EditorUtility.SetDirty(m);
-        report.AppendLine("EID" + p.eid + ": material res33=RID" + Rid(p, "res33") + " res35=RID" + Rid(p, "res35") + " res37=RID" + Rid(p, "res37") + " res38=RID" + Rid(p, "res38") + " PS uniforms43=" + local.Length + "B");
+        report.AppendLine("EID" + p.eid + ": material res33=RID" + Rid(p, "res33") + " res35=RID" + Rid(p, "res35") + " res37=RID" + Rid(p, "res37") + " res38=RID" + Rid(p, "res38") + " res39=RID" + Rid(p, "res39") + " res40=RID" + Rid(p, "res40") + " res41=RID" + Rid(p, "res41") + " PS uniforms43=" + local.Length + "B");
         return m;
     }
 

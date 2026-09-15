@@ -190,15 +190,29 @@ public static class EID3315RenderDocCameraImporter
     {
         var table=AssetDatabase.LoadAssetAtPath<Material>(Root+"/Geometry/EID3315CapturedTextureTable.mat");
         if(!table) throw new FileNotFoundException("Missing EID3315 texture table.");
-        foreach(string prop in table.GetTexturePropertyNames()) if(m.HasProperty(prop))
+        string[] slots={"_33","_35","_37","_38","_39","_40","_41","_42","_53","_54","_55","_56","_57","_58","_59","_60","_61","_62","_63","_64","_65"};
+        for(int s=0;s<slots.Length;s++)
         {
-            Texture texture=table.GetTexture(prop);
-            if(texture) {m.SetTexture(prop,texture); report.AppendLine(prop+"="+AssetDatabase.GetAssetPath(texture));}
+            if(!m.HasProperty(slots[s])) continue;
+            Texture texture=table.GetTexture(slots[s]);
+            if(texture) {m.SetTexture(slots[s],texture); report.AppendLine(slots[s]+"="+AssetDatabase.GetAssetPath(texture));}
         }
         string[] primary={"_33","_35","_37","_38","_39"};
         string[] ids={"271247","198537","227514","197602","198541"};
-        for(int i=0;i<primary.Length;i++) if(!m.GetTexture(primary[i]) || !AssetDatabase.GetAssetPath(m.GetTexture(primary[i])).Contains("rid"+ids[i]+"_"))
+        for(int i=0;i<primary.Length;i++) if(!m.GetTexture(primary[i]) || !AssetDatabase.GetAssetPath(m.GetTexture(primary[i])).Contains("rid"+ids[i]))
             throw new InvalidDataException("EID3315 texture RID mismatch for "+primary[i]);
+        string[] projection={"_40","_41","_42"};
+        string[] projectionIds={"204","197598","198094"};
+        for(int i=0;i<projection.Length;i++)
+        {
+            Texture texture=m.GetTexture(projection[i]);
+            string path=texture ? AssetDatabase.GetAssetPath(texture) : "";
+            if(texture==null || !(path.Contains("rid"+projectionIds[i]+".") || path.Contains("rid"+projectionIds[i]+"_")))
+                throw new InvalidDataException("EID3315 missing Combined-reuse projection slot "+projection[i]+" RID"+projectionIds[i]);
+        }
+        string[] frame={"_53","_54","_55","_56","_57","_58","_59","_60","_61","_62","_63","_64","_65"};
+        for(int i=0;i<frame.Length;i++) if(!m.GetTexture(frame[i]))
+            throw new InvalidDataException("EID3315 missing shared frame slot "+frame[i]);
         byte[] b=Read("PS_uniforms44"); if(b.Length!=720) throw new InvalidDataException("uniforms44 must contain 45 float4 slots.");
         for(int i=0;i<45;i++) m.SetVector("_EID3336PSLocalParam"+i.ToString("00"),V4(b,i*16));
         m.SetFloat("_EID3336PSUseLocalParams",1); m.SetFloat("_EID3336UseLocalVSOverrides",0);

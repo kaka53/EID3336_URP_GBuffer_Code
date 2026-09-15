@@ -7,6 +7,9 @@ TEXTURE2D(_Res33); SAMPLER(sampler_Res33);
 TEXTURE2D(_Res35); SAMPLER(sampler_Res35);
 TEXTURE2D(_Res37); SAMPLER(sampler_Res37);
 TEXTURE2D(_Res38); SAMPLER(sampler_Res38);
+TEXTURE2D(_Res39); SAMPLER(sampler_Res39);
+TEXTURE2D(_Res40); SAMPLER(sampler_Res40);
+TEXTURE2D(_Res41); SAMPLER(sampler_Res41);
 
 CBUFFER_START(UnityPerMaterial)
 float4 _P00; float4 _P01; float4 _P02; float4 _P03;
@@ -51,6 +54,7 @@ struct Varyings209988
     float3 currentClipXYW : TEXCOORD5;
     float3 previousClipXYW : TEXCOORD6;
     nointerpolation uint instanceIndex : TEXCOORD7;
+    float3 positionWS : TEXCOORD8;
 };
 
 float3 DecodeOctNormal209988(uint packed)
@@ -108,6 +112,7 @@ Varyings209988 EID209988Vertex(Attributes209988 input)
     o.currentClipXYW = clip.xyw;
     o.previousClipXYW = clip.xyw;
     o.instanceIndex = 0u;
+    o.positionWS = positionWS;
     return o;
 }
 
@@ -171,11 +176,48 @@ GBufferOutput209989 EID209989Fragment(Varyings209988 input, bool isFrontFace : S
     float3 n = normalize(input.normalWS);
     float3 t = normalize(input.tangentWS.xyz);
     float3 b = normalize(cross(n, t)) * tangentInputSign;
+    float3 mappedN = normalize(t * blendedTS.x + b * blendedTS.y + n * blendedTS.z);
+    float heightSrcY = lerp(n.y, mappedN.y, _P32.z);
+    float heightFade = saturate(saturate((heightSrcY - _P32.y) / max(1.17549435e-38, _P32.x)));
+
+    uint axis = (uint)_P26.x;
+    float2 extraUV;
+    if (axis == 0u)
+        extraUV = input.uv0;
+    else if (axis == 1u)
+        extraUV = input.positionWS.xz;
+    else
+        extraUV = input.uv2;
+    extraUV = extraUV * _P26.z + _P31.xy;
+
+    float4 extraColorSample = SAMPLE_TEXTURE2D_BIAS(_Res40, sampler_Res40, extraUV, _EID209989MipBias);
+    float luma = dot(extraColorSample.rgb, float3(0.2126729, 0.7151522, 0.0721750));
+    float3 extraColor = lerp(luma.xxx, extraColorSample.rgb, saturate(_P28.w + 1.0)) * _P30.rgb * _P29.x;
+    float4 extraNSample = SAMPLE_TEXTURE2D_BIAS(_Res41, sampler_Res41, extraUV, _EID209989MipBias);
+    float2 en = extraNSample.xy * 2.0 - 1.0;
+    float extraNz = max(1.00000002e-16, sqrt(saturate(1.0 - saturate(dot(en, en)))));
+    float3 extraTS = float3(en * _P26.w, extraNz);
+
+    float extra39 = SAMPLE_TEXTURE2D_BIAS(_Res39, sampler_Res39, extraUV, _EID209989MipBias).x;
+    float2 pairW = float2(1.0 - heightFade, heightFade);
+    float2 pair = pairW * float2(extra39, extraColorSample.a);
+    float2 tpair = (max(0.0.xx, (pair + _P26.y.xx) - max(pair.x, pair.y).xx) + 1e-7) * pairW;
+    float extraMask = _P28.y != 0.0 ? (tpair / max(1.17549435e-38, tpair.x + tpair.y)).y : heightFade;
+
+    float3 extraBase = blendedTS + float3(0.0, 0.0, 1.0);
+    float3 extraFlip = extraTS * float3(-1.0, -1.0, 1.0);
+    float3 extraReoriented = (extraBase * dot(extraBase, extraFlip)) / max(1e-5, extraBase.z) - extraFlip;
+    blendedTS = lerp(blendedTS, lerp(extraTS, extraReoriented, _P27.w.xxx), extraMask.xxx);
+    baseColor = lerp(baseColor, extraColor, extraMask.xxx);
+    materialY = lerp(materialY, _P27.y != 0.0 ? extraColorSample.a : _P27.x, extraMask);
+    roughness = lerp(roughness, extraNSample.z, extraMask);
+    ao = lerp(ao, _P28.z != 0.0 ? 1.0 : lerp(1.0, extraNSample.w, _P27.z), extraMask);
+
     float3 tangentN = float3(blendedTS.xy, blendedTS.z * faceSign);
     float3 normalWS = normalize(t * tangentN.x + b * tangentN.y + n * tangentN.z);
 
     uint materialId = (uint)_InstanceMeta.w;
-    float materialZ = (saturate(_P04.w * roughness + _P05.y * materialY + _P05.x) * 0.95 + 0.05) * (1.0 - _P07.y);
+    float materialZ = (saturate(_P04.w * roughness + _P05.y * materialY + _P05.x) * 0.95 + 0.05) * step(extraMask, 1.0 - _P28.x) * (1.0 - _P07.y);
     float active = saturate(float((int)sign(max(_InstanceStateYZ.x, _InstanceStateYZ.y) - 0.1)));
 
     float2 motion = input.currentClipXYW.xy / max(input.currentClipXYW.z, 1e-8) - input.previousClipXYW.xy / max(input.previousClipXYW.z, 1e-8);

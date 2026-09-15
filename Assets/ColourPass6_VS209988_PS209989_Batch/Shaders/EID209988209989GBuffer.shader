@@ -3,10 +3,13 @@ Shader "EID/URP/VS209988_PS209989_GBuffer"
     Properties
     {
         [Header(RenderDoc_Shared_And_Unique_Textures)]
-        _Res33 ("res33 共享基础颜色 Binding2", 2D) = "white" {}
-        _Res35 ("res35 切线法线 Binding3", 2D) = "bump" {}
-        _Res37 ("res37 细节叠加 Binding6", 2D) = "gray" {}
-        _Res38 ("res38 细节法线 Binding6b", 2D) = "bump" {}
+        _Res33 ("res33 共享基础颜色 Binding8", 2D) = "white" {}
+        _Res35 ("res35 切线法线 Binding2", 2D) = "bump" {}
+        _Res37 ("res37 细节叠加 Binding3", 2D) = "gray" {}
+        _Res38 ("res38 细节法线 Binding6", 2D) = "bump" {}
+        _Res39 ("res39 额外混合 Binding7 RID204", 2D) = "white" {}
+        _Res40 ("res40 额外颜色 Binding5 RID197598", 2D) = "white" {}
+        _Res41 ("res41 额外法线 Binding4 RID198094", 2D) = "bump" {}
         [Header(RenderDoc_PS_uniforms43_c00_c44)]
         _P00 ("c00 法线强度及粗糙度范围", Vector) = (1,0,0,1)
         _P01 ("c01 AO与双面法线", Vector) = (1,0,0,0)

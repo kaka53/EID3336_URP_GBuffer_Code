@@ -12,6 +12,7 @@ using UnityEditor;
 public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336URPGBufferProvider, IEID3336URPDeferredLightingProvider
 {
     public enum ProjectionSource { RenderDocCaptured = 0, CurrentUnityCamera = 1 }
+    public enum BinaryValueChoice { Zero = 0, One = 1 }
     public enum B6ViewMode { FinalLighting = 0, DirectLighting = 1, IndirectDiffuse = 2, IndirectSpecular = 3, CapturedLighting = 4, BRDF = 5, BaseColor = 6, NormalWS = 7, WorldPosition = 8, Material = 9, LinearDepth = 10, ProbeReflection = 11, ScreenSpecular = 12, CombinedIndirect = 13, ProbeWeight = 14, ReflectionValidity = 15, GBuffer0 = 16, GBuffer1 = 17, GBuffer2 = 18, GBuffer3 = 19 }
 
     [Header("Combined scene")]
@@ -58,6 +59,23 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
     public EID4662FullLightPassBinding.RealtimeIndirectMode eid4662RealtimeIndirectMode = EID4662FullLightPassBinding.RealtimeIndirectMode.CurrentCapturedResources;
     [Tooltip("Diagnostic override for sampled deferred-light textures: leave unchanged, force sampled values to 0, or force them to 1.")]
     public EID4662FullLightPassBinding.SampleTextureOverrideMode eid4662SampleTextureOverride = EID4662FullLightPassBinding.SampleTextureOverrideMode.Unchanged;
+    [Header("EID4662 Screen/Reflection Texture Controls")]
+    [Tooltip("_18 插值目标，只能选择 0 或 1。")]
+    public BinaryValueChoice eid4662Res18LerpValue = BinaryValueChoice.One;
+    [Tooltip("_18 采样值到 0/1 目标值的插值权重。0=原始纹理，1=完全使用选择值。")]
+    [Range(0f, 1f)] public float eid4662Res18LerpWeight = 0f;
+    [Tooltip("_29 插值目标，只能选择 0 或 1；0=无效，1=有效。")]
+    public BinaryValueChoice eid4662Res29LerpValue = BinaryValueChoice.Zero;
+    [Tooltip("_29 采样值到 0/1 目标值的插值权重。0=原始纹理，1=完全使用选择值。")]
+    [Range(0f, 1f)] public float eid4662Res29LerpWeight = 0f;
+    [Tooltip("_29 反射有效性判断阈值；插值后的值低于此值时跳过反射计算。")]
+    [Range(0f, 1f)] public float eid4662Res29Threshold = 0.001f;
+    [Tooltip("_33 插值目标，只能选择 0 或 1；0=不可见，1=完全可见。")]
+    public BinaryValueChoice eid4662Res33LerpValue = BinaryValueChoice.One;
+    [Tooltip("_33 采样值到 0/1 目标值的插值权重。0=原始纹理，1=完全使用选择值。")]
+    [Range(0f, 1f)] public float eid4662Res33LerpWeight = 0f;
+    [Tooltip("_33 反射可见性阈值；低于此值时按 0 处理。默认 0 保持原始算法。")]
+    [Range(0f, 1f)] public float eid4662Res33Threshold = 0f;
     [Tooltip("Which EID4662 sampled-texture group receives the diagnostic override.")]
     public EID4662FullLightPassBinding.SampleTextureOverrideScope eid4662SampleTextureOverrideScope = EID4662FullLightPassBinding.SampleTextureOverrideScope.ScreenSpace;
     [Tooltip("When enabled, adjustable lighting/profile values come from the B6 material inspector. The pipeline only supplies live GBuffer, depth, camera, screen and ComputeBuffer data.")]
@@ -488,6 +506,16 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
             bool useCapturedScreenSpace = useCapturedProjection || eid4662UseCapturedScreenSpaceInRealtime;
             eid4662FullBinding.Bind(material, useCapturedScreenSpace, eid4662RealtimeIndirectMode,
                 eid4662SampleTextureOverride, eid4662SampleTextureOverrideScope);
+            // Keep _29 controls on the controller so the runtime per-camera
+            // material receives the same values every frame.
+            material.SetFloat("_EID4662Res18LerpValue", (float)eid4662Res18LerpValue);
+            material.SetFloat("_EID4662Res18LerpWeight", Mathf.Clamp01(eid4662Res18LerpWeight));
+            material.SetFloat("_EID4662Res29LerpValue", (float)eid4662Res29LerpValue);
+            material.SetFloat("_EID4662Res29LerpWeight", Mathf.Clamp01(eid4662Res29LerpWeight));
+            material.SetFloat("_EID4662Res29Threshold", Mathf.Clamp01(eid4662Res29Threshold));
+            material.SetFloat("_EID4662Res33LerpValue", (float)eid4662Res33LerpValue);
+            material.SetFloat("_EID4662Res33LerpWeight", Mathf.Clamp01(eid4662Res33LerpWeight));
+            material.SetFloat("_EID4662Res33Threshold", Mathf.Clamp01(eid4662Res33Threshold));
             material.SetFloat("_EID4662UseLiveCamera", useCapturedProjection ? 0f : 1f);
             // Live SceneView/Game output replaces the covered pixels. The
             // captured replay path keeps RenderDoc's original destination blend.
