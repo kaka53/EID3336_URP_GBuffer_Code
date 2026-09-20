@@ -33,12 +33,21 @@ Shader "Hidden/EID3332Combined/Deferred/EID4662Full"
         [HideInInspector] _EID4662DepthEpsilon ("EID4662 Depth Epsilon", Float) = 0.00001
         [Enum(0,0,1,1)] _EID4662Res18LerpValue ("_18 屏幕高光插值目标", Float) = 1
         _EID4662Res18LerpWeight ("_18 屏幕高光插值权重", Range(0,1)) = 0
+        [Enum(0,0,1,1)] _EID4662Res19LerpValue ("_19 屏幕高光权重插值目标", Float) = 1
+        _EID4662Res19LerpWeight ("_19 屏幕高光权重插值权重", Range(0,1)) = 0
+        _EID4662Res19Threshold ("_19 屏幕高光权重阈值", Range(0,1)) = 0
+        [Enum(0,0,1,1)] _EID4662Res20LerpValue ("_20 SSAO插值目标", Float) = 1
+        _EID4662Res20LerpWeight ("_20 SSAO插值权重", Range(0,1)) = 0
+        _EID4662Res20Threshold ("_20 SSAO阈值", Range(0,1)) = 0
         [Enum(0,0,1,1)] _EID4662Res29LerpValue ("_29 反射有效性插值目标", Float) = 0
         _EID4662Res29LerpWeight ("_29 反射有效性插值权重", Range(0,1)) = 0
         _EID4662Res29Threshold ("_29 反射有效性阈值", Range(0,1)) = 0.001
         [Enum(0,0,1,1)] _EID4662Res33LerpValue ("_33 反射可见性插值目标", Float) = 1
         _EID4662Res33LerpWeight ("_33 反射可见性插值权重", Range(0,1)) = 0
         _EID4662Res33Threshold ("_33 反射可见性阈值", Range(0,1)) = 0
+        [Enum(0,0,1,1)] _EID4662Res38LerpValue ("_38 Screen SH插值目标", Float) = 1
+        _EID4662Res38LerpWeight ("_38 Screen SH插值权重", Range(0,1)) = 0
+        _EID4662Res38Threshold ("_38 Screen SH阈值", Range(0,1)) = 0
     }
     SubShader
     {
@@ -57,12 +66,21 @@ Shader "Hidden/EID3332Combined/Deferred/EID4662Full"
             #pragma fragment EID4662FullFragment
             float _EID4662Res18LerpValue;
             float _EID4662Res18LerpWeight;
+            float _EID4662Res19LerpValue;
+            float _EID4662Res19LerpWeight;
+            float _EID4662Res19Threshold;
+            float _EID4662Res20LerpValue;
+            float _EID4662Res20LerpWeight;
+            float _EID4662Res20Threshold;
             float _EID4662Res29LerpValue;
             float _EID4662Res29LerpWeight;
             float _EID4662Res29Threshold;
             float _EID4662Res33LerpValue;
             float _EID4662Res33LerpWeight;
             float _EID4662Res33Threshold;
+            float _EID4662Res38LerpValue;
+            float _EID4662Res38LerpWeight;
+            float _EID4662Res38Threshold;
             #include "EID4662FullFS.hlsl"
 
             float4 _EID4662OutputSize;
@@ -121,12 +139,21 @@ Shader "Hidden/EID3332Combined/Deferred/EID4662Full"
             #pragma fragment EID4662FullFragment
             float _EID4662Res18LerpValue;
             float _EID4662Res18LerpWeight;
+            float _EID4662Res19LerpValue;
+            float _EID4662Res19LerpWeight;
+            float _EID4662Res19Threshold;
+            float _EID4662Res20LerpValue;
+            float _EID4662Res20LerpWeight;
+            float _EID4662Res20Threshold;
             float _EID4662Res29LerpValue;
             float _EID4662Res29LerpWeight;
             float _EID4662Res29Threshold;
             float _EID4662Res33LerpValue;
             float _EID4662Res33LerpWeight;
             float _EID4662Res33Threshold;
+            float _EID4662Res38LerpValue;
+            float _EID4662Res38LerpWeight;
+            float _EID4662Res38Threshold;
             #include "EID4662FullFS.hlsl"
 
             float4 _EID4662OutputSize;

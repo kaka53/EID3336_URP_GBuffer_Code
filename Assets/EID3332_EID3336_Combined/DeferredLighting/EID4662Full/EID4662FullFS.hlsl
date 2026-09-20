@@ -432,7 +432,11 @@ void frag_main()
     [branch]
     if (_9_m23.x != 0.0f)
     {
-        float _621 = min(_20.SampleBias(sampler_PointClamp, _4, _9_m16).x, _309);
+        float _20Raw = saturate(_20.SampleBias(sampler_PointClamp, _4, _9_m16).x);
+        float _20Value = saturate(lerp(_20Raw, saturate(_EID4662Res20LerpValue), saturate(_EID4662Res20LerpWeight)));
+        float _20Threshold = max(0.0f, _EID4662Res20Threshold);
+        float _20AO = (_20Value >= _20Threshold) ? _20Value : 0.0f;
+        float _621 = min(_20AO, _309);
         _645 = clamp((pow(abs(_432 + _621), exp2(((-16.0f) * _422) - 1.0f)) - 1.0f) + _621, 0.0f, 1.0f).xxx;
         _646 = max(_621.xxx, ((((((_426 * 2.040400028228759765625f) - 0.3323999941349029541015625f.xxx) * _621) + ((_426 * (-4.79510021209716796875f)) + 0.6417000293731689453125f.xxx)) * _621) + ((_426 * 2.755199909210205078125f) + 0.69029998779296875f.xxx)) * _621);
     }
@@ -571,7 +575,11 @@ void frag_main()
     [branch]
     if (all(bool2(_350.x >= 0.0f.xx.x, _350.y >= 0.0f.xx.y)))
     {
-        float4 _1070 = _38.SampleLevel(sampler_LinearClamp, _350, 0.0f);
+        float4 _1070Raw = _38.SampleLevel(sampler_LinearClamp, _350, 0.0f);
+        float4 _1070 = lerp(_1070Raw, saturate(_EID4662Res38LerpValue).xxxx, saturate(_EID4662Res38LerpWeight));
+        float _38AbsMax = max(max(abs(_1070.x), abs(_1070.y)), max(abs(_1070.z), abs(_1070.w)));
+        if (_38AbsMax < max(0.0f, _EID4662Res38Threshold))
+            _1070 = 0.0f.xxxx;
         float4 _1071 = abs(_1070);
         float4 _1217;
         float4 _1218;
@@ -741,7 +749,10 @@ void frag_main()
     if (_9_m23.y != 0.0f)
     {
         float4 _1542 = _19.SampleBias(sampler_LinearClamp, _4, _9_m16);
-        float _1543 = _1542.x;
+        float _19Raw = saturate(_1542.x);
+        float _19Value = saturate(lerp(_19Raw, saturate(_EID4662Res19LerpValue), saturate(_EID4662Res19LerpWeight)));
+        float _19Threshold = max(0.0f, _EID4662Res19Threshold);
+        float _1543 = (_19Value >= _19Threshold) ? _19Value : 0.0f;
         float3 _18Raw = _18.SampleBias(sampler_LinearClamp, _4, _9_m16).xyz;
         float _18Weight = saturate(_EID4662Res18LerpWeight);
         float3 _18Value = lerp(_18Raw, _EID4662Res18LerpValue.xxx, _18Weight);

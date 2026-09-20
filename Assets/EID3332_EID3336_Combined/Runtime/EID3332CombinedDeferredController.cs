@@ -64,6 +64,18 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
     public BinaryValueChoice eid4662Res18LerpValue = BinaryValueChoice.One;
     [Tooltip("_18 采样值到 0/1 目标值的插值权重。0=原始纹理，1=完全使用选择值。")]
     [Range(0f, 1f)] public float eid4662Res18LerpWeight = 0f;
+    [Tooltip("_19 插值目标，只能选择 0 或 1；0=不用屏幕高光，1=全用屏幕高光。")]
+    public BinaryValueChoice eid4662Res19LerpValue = BinaryValueChoice.One;
+    [Tooltip("_19 采样值到 0/1 目标值的插值权重。0=原始纹理，1=完全使用选择值。")]
+    [Range(0f, 1f)] public float eid4662Res19LerpWeight = 0f;
+    [Tooltip("_19 屏幕高光权重阈值；低于此值时按 0 处理。默认 0 保持原始算法。")]
+    [Range(0f, 1f)] public float eid4662Res19Threshold = 0f;
+    [Tooltip("_20 插值目标，只能选择 0 或 1；0=无 AO，1=全 AO。")]
+    public BinaryValueChoice eid4662Res20LerpValue = BinaryValueChoice.One;
+    [Tooltip("_20 采样值到 0/1 目标值的插值权重。0=原始纹理，1=完全使用选择值。")]
+    [Range(0f, 1f)] public float eid4662Res20LerpWeight = 0f;
+    [Tooltip("_20 SSAO 阈值；低于此值时按 0 处理。默认 0 保持原始算法。")]
+    [Range(0f, 1f)] public float eid4662Res20Threshold = 0f;
     [Tooltip("_29 插值目标，只能选择 0 或 1；0=无效，1=有效。")]
     public BinaryValueChoice eid4662Res29LerpValue = BinaryValueChoice.Zero;
     [Tooltip("_29 采样值到 0/1 目标值的插值权重。0=原始纹理，1=完全使用选择值。")]
@@ -76,6 +88,12 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
     [Range(0f, 1f)] public float eid4662Res33LerpWeight = 0f;
     [Tooltip("_33 反射可见性阈值；低于此值时按 0 处理。默认 0 保持原始算法。")]
     [Range(0f, 1f)] public float eid4662Res33Threshold = 0f;
+    [Tooltip("_38 插值目标，只能选择 0 或 1；0=关闭 Screen SH，1=强制 (1,1,1,1)。")]
+    public BinaryValueChoice eid4662Res38LerpValue = BinaryValueChoice.One;
+    [Tooltip("_38 采样值到 0/1 目标值的插值权重。0=原始纹理，1=完全使用选择值。")]
+    [Range(0f, 1f)] public float eid4662Res38LerpWeight = 0f;
+    [Tooltip("_38 Screen SH 阈值；max(abs) 低于此值时按 0 处理（走 irradiance SH）。默认 0 保持原始算法。")]
+    [Range(0f, 1f)] public float eid4662Res38Threshold = 0f;
     [Tooltip("Which EID4662 sampled-texture group receives the diagnostic override.")]
     public EID4662FullLightPassBinding.SampleTextureOverrideScope eid4662SampleTextureOverrideScope = EID4662FullLightPassBinding.SampleTextureOverrideScope.ScreenSpace;
     [Tooltip("When enabled, adjustable lighting/profile values come from the B6 material inspector. The pipeline only supplies live GBuffer, depth, camera, screen and ComputeBuffer data.")]
@@ -510,12 +528,21 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
             // material receives the same values every frame.
             material.SetFloat("_EID4662Res18LerpValue", (float)eid4662Res18LerpValue);
             material.SetFloat("_EID4662Res18LerpWeight", Mathf.Clamp01(eid4662Res18LerpWeight));
+            material.SetFloat("_EID4662Res19LerpValue", (float)eid4662Res19LerpValue);
+            material.SetFloat("_EID4662Res19LerpWeight", Mathf.Clamp01(eid4662Res19LerpWeight));
+            material.SetFloat("_EID4662Res19Threshold", Mathf.Clamp01(eid4662Res19Threshold));
+            material.SetFloat("_EID4662Res20LerpValue", (float)eid4662Res20LerpValue);
+            material.SetFloat("_EID4662Res20LerpWeight", Mathf.Clamp01(eid4662Res20LerpWeight));
+            material.SetFloat("_EID4662Res20Threshold", Mathf.Clamp01(eid4662Res20Threshold));
             material.SetFloat("_EID4662Res29LerpValue", (float)eid4662Res29LerpValue);
             material.SetFloat("_EID4662Res29LerpWeight", Mathf.Clamp01(eid4662Res29LerpWeight));
             material.SetFloat("_EID4662Res29Threshold", Mathf.Clamp01(eid4662Res29Threshold));
             material.SetFloat("_EID4662Res33LerpValue", (float)eid4662Res33LerpValue);
             material.SetFloat("_EID4662Res33LerpWeight", Mathf.Clamp01(eid4662Res33LerpWeight));
             material.SetFloat("_EID4662Res33Threshold", Mathf.Clamp01(eid4662Res33Threshold));
+            material.SetFloat("_EID4662Res38LerpValue", (float)eid4662Res38LerpValue);
+            material.SetFloat("_EID4662Res38LerpWeight", Mathf.Clamp01(eid4662Res38LerpWeight));
+            material.SetFloat("_EID4662Res38Threshold", Mathf.Clamp01(eid4662Res38Threshold));
             material.SetFloat("_EID4662UseLiveCamera", useCapturedProjection ? 0f : 1f);
             // Live SceneView/Game output replaces the covered pixels. The
             // captured replay path keeps RenderDoc's original destination blend.
@@ -530,6 +557,8 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
             material.SetMatrix("_EID4662ClipToWorld", worldToClip.inverse);
             Vector3 cameraPosition = GetCameraPosition(camera);
             material.SetVector("_EID4662CameraPositionWS", new Vector4(cameraPosition.x, cameraPosition.y, cameraPosition.z, 1f));
+            EndfieldCP2ExactReplayFeature.ApplyDeferredLightPassOverride(material, camera);
+            EID4649ColourPass20Feature.ApplyDeferredLightPass29Override(material, camera);
             return true;
         }
         BindCapturedLightingInputsToMaterial(material);

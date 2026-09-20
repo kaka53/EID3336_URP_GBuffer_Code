@@ -42,6 +42,15 @@ public sealed class EID5618PostProcessRendererFeature : ScriptableRendererFeatur
         [Tooltip("HDR 调试输入映射的尺度。RawRes9/RawRes10 下使用，建议 1。")]
         [Min(0.0001f)]
         public float debugScale = 1f;
+
+        public enum BinaryValueChoice { Zero = 0, One = 1 }
+        [Header("res10 / _eid5617Res10 bloom")]
+        [Tooltip("res10 插值目标，只能选择 0 或 1；0=关闭 bloom，1=强制 1。")]
+        public BinaryValueChoice res10LerpValue = BinaryValueChoice.One;
+        [Tooltip("res10 采样值到 0/1 目标值的插值权重。0=原始纹理，1=完全使用选择值。")]
+        [Range(0f, 1f)] public float res10LerpWeight = 0f;
+        [Tooltip("res10 bloom 阈值；max(rgb) 低于此值时按 0 处理。默认 0 保持原始算法。")]
+        [Range(0f, 1f)] public float res10Threshold = 0f;
     }
 
     public Settings settings = new Settings();
@@ -161,6 +170,9 @@ sealed class EID5618PostProcessPass : ScriptableRenderPass
     static readonly int OutputDecodeSrgb = Shader.PropertyToID("_EID5618OutputDecodeSrgb");
     static readonly int DebugMode = Shader.PropertyToID("_EID5618DebugMode");
     static readonly int DebugScale = Shader.PropertyToID("_EID5618DebugScale");
+    static readonly int Res10LerpValue = Shader.PropertyToID("_EID5618Res10LerpValue");
+    static readonly int Res10LerpWeight = Shader.PropertyToID("_EID5618Res10LerpWeight");
+    static readonly int Res10Threshold = Shader.PropertyToID("_EID5618Res10Threshold");
     static readonly int B5 = Shader.PropertyToID("_13_14");
     static readonly int B6 = Shader.PropertyToID("_5_6");
     static readonly int GeneratedRes14 = Shader.PropertyToID("_13");
@@ -370,6 +382,9 @@ sealed class EID5618PostProcessPass : ScriptableRenderPass
             material.SetTexture(Res11, lut);
             material.SetFloat(DebugMode, (float)settings.debugOutput);
             material.SetFloat(DebugScale, Mathf.Max(0.0001f, settings.debugScale));
+            material.SetFloat(Res10LerpValue, (float)settings.res10LerpValue);
+            material.SetFloat(Res10LerpWeight, Mathf.Clamp01(settings.res10LerpWeight));
+            material.SetFloat(Res10Threshold, Mathf.Clamp01(settings.res10Threshold));
 
             if (!loggedBindings)
             {

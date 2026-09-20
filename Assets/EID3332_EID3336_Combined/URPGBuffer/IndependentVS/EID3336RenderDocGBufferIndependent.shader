@@ -116,6 +116,23 @@ Shader "EID3336/URP/RenderDocGBufferIndependent"
             #include "EID3336RenderDocGBufferIndependent.hlsl"
             ENDHLSL
         }
+        Pass
+        {
+            Name "EID3336_RenderDoc_Independent_Projection_195163"
+            Tags { "LightMode"="EID3336IndependentProjection" }
+            Cull Off
+            ZTest LEqual
+            ZWrite On
+            Blend Off
+            ColorMask R
+            HLSLPROGRAM
+            #pragma target 5.0
+            #pragma exclude_renderers gles gles3 glcore
+            #pragma vertex EID3336IndependentProjectionVertex
+            #pragma fragment EID3336IndependentProjectionFragment
+            #include "EID3336VS195163_IndependentProjection.hlsl"
+            ENDHLSL
+        }
     }
 
     CustomEditor "EID3336RenderDocGBufferShaderGUI"

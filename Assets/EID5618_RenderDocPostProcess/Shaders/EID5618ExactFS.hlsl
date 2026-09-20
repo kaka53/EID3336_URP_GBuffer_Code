@@ -177,6 +177,9 @@ TEXTURE2D(_EID5618Res10);
 SAMPLER(sampler_EID5618Res10);
 TEXTURE2D(_EID5618Res11);
 SAMPLER(sampler_EID5618Res11);
+float _EID5618Res10LerpValue;
+float _EID5618Res10LerpWeight;
+float _EID5618Res10Threshold;
 
 static float2 _3;
 static float4 _4;
@@ -257,7 +260,11 @@ void frag_main()
     float _411 = (max(-0.1875f, min(max(max(-(_363 * (0.25f / _372)), (1.0f - _372) * (1.0f / ((4.0f * _363) + (-4.0f)))), max(max(-(_366 * (0.25f / _375)), (1.0f - _375) * (1.0f / ((4.0f * _366) + (-4.0f)))), max(-(_369 * (0.25f / _378)), (1.0f - _378) * (1.0f / ((4.0f * _369) + (-4.0f)))))), 0.0f)) * _14_m24.x) * (((-0.5f) * clamp(abs((0.25f * (((_324 + _328) + _336) + _340)) - _332) * (1.0f / (max(max(_324, max(_328, _332)), max(_336, _340)) - min(min(_324, min(_328, _332)), min(_336, _340)))), 0.0f, 1.0f)) + 1.0f);
     float _414 = 1.0f / ((4.0f * _411) + 1.0f);
     float3 _436 = float3(((_411 * (((_306 + _309) + _318) + _315)) + _275.x) * _414, ((_411 * (((_307 + _310) + _319) + _316)) + _275.y) * _414, ((_411 * (((_308 + _311) + _320) + _317)) + _275.z) * _414) * _6_m20.x;
-    float3 _441 = EID5618_SAMPLE_RES10(_3, 0.0f).xyz;
+    float3 _441Raw = EID5618_SAMPLE_RES10(_3, 0.0f).xyz;
+    float3 _441 = lerp(_441Raw, saturate(_EID5618Res10LerpValue).xxx, saturate(_EID5618Res10LerpWeight));
+    float _441AbsMax = max(max(abs(_441.x), abs(_441.y)), abs(_441.z));
+    if (_441AbsMax < max(0.0f, _EID5618Res10Threshold))
+        _441 = 0.0f.xxx;
     float3 _445 = _441 * (1.0f - _14_m9.z);
     bool3 _446 = bool3(_445.x > 0.300000011920928955078125f.xxx.x, _445.y > 0.300000011920928955078125f.xxx.y, _445.z > 0.300000011920928955078125f.xxx.z);
     float3 _449 = (pow(_441, 0.3300000131130218505859375f.xxx) * 1.49380004405975341796875f) - 0.699999988079071044921875f.xxx;

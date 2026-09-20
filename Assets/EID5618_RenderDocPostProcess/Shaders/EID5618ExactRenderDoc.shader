@@ -9,6 +9,9 @@ Shader "Hidden/EID5618/ExactRenderDoc"
         [HideInInspector] _EID5618LinearDisplay ("Decode encoded sRGB into linear camera", Float) = 1
         [HideInInspector] _EID5618DebugMode ("EID5618 debug output mode", Float) = 0
         [HideInInspector] _EID5618DebugScale ("EID5618 debug HDR display scale", Float) = 1
+        [Enum(0,0,1,1)] _EID5618Res10LerpValue ("_eid5617Res10 bloom插值目标", Float) = 1
+        _EID5618Res10LerpWeight ("_eid5617Res10 bloom插值权重", Range(0,1)) = 0
+        _EID5618Res10Threshold ("_eid5617Res10 bloom阈值", Range(0,1)) = 0
     }
     SubShader
     {
