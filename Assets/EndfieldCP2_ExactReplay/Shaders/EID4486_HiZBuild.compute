@@ -1,0 +1,50 @@
+#pragma kernel HiZBuild
+
+Texture2D<float> _Depth;
+SamplerState sampler_Depth;
+RWTexture2D<float> _HiZ;
+
+cbuffer uniforms14
+{
+    float4 _child0;
+    float4 _child1;
+    float4 _child2;
+};
+
+float SampleDepth(uint2 px)
+{
+    float2 uv = (float2(px) + 0.5) * _child0.zw;
+    return _Depth.SampleLevel(sampler_Depth, uv, 0);
+}
+
+[numthreads(8, 8, 1)]
+void HiZBuild(uint3 id : SV_DispatchThreadID)
+{
+    uint2 gid = id.xy;
+    uint2 dstSize = (uint2)_child1.xy;
+    if (gid.x >= dstSize.x || gid.y >= dstSize.y)
+        return;
+
+    uint2 base = gid * 2;
+    float d = SampleDepth(base);
+    d = max(d, SampleDepth(base + uint2(0, 1)));
+    d = max(d, SampleDepth(base + uint2(1, 0)));
+    d = max(d, SampleDepth(base + uint2(1, 1)));
+
+    uint srcW = (uint)_child0.x;
+    uint srcH = (uint)_child0.y;
+    if (srcW & 1u)
+    {
+        d = max(d, SampleDepth(base + uint2(2, 0)));
+        d = max(d, SampleDepth(base + uint2(2, 1)));
+    }
+    if (srcH & 1u)
+    {
+        d = max(d, SampleDepth(base + uint2(0, 2)));
+        d = max(d, SampleDepth(base + uint2(1, 2)));
+    }
+    if ((srcW & 1u) && (srcH & 1u))
+        d = max(d, SampleDepth(base + uint2(2, 2)));
+
+    _HiZ[gid] = d;
+}

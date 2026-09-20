@@ -60,8 +60,10 @@ public sealed class EID4662FullLightPassBinding
         LoadBuffers(material);
         if (!useCapturedScreenSpace) ApplyRealtimeMode(material, realtimeMode);
         ApplySampleTextureOverride(material, overrideMode, overrideScope);
-        material.SetFloat("_EID4662EnableFullModules", realtimeMode == RealtimeIndirectMode.DirectOnly ? 0f : 1f);
-        material.SetFloat("_EID4662OutputAlpha", 1f);
+        if (material.HasProperty("_EID4662EnableFullModules"))
+            material.SetFloat("_EID4662EnableFullModules", realtimeMode == RealtimeIndirectMode.DirectOnly ? 0f : 1f);
+        if (material.HasProperty("_EID4662OutputAlpha"))
+            material.SetFloat("_EID4662OutputAlpha", 1f);
     }
 
     void ApplySampleTextureOverride(Material material, SampleTextureOverrideMode mode, SampleTextureOverrideScope scope)
@@ -105,7 +107,7 @@ public sealed class EID4662FullLightPassBinding
             material.SetTexture("_33", value2D);
         }
         if (fog) material.SetTexture("_34", value3D);
-        if (mask) material.SetTexture("_45", value2D);
+        if (mask && material.HasProperty("_45")) material.SetTexture("_45", value2D);
     }
 
     Texture3D GetNeutralVolume(bool one)
@@ -147,7 +149,8 @@ public sealed class EID4662FullLightPassBinding
         material.SetTexture("_19", Texture2D.blackTexture);
         material.SetTexture("_20", Texture2D.whiteTexture);
         material.SetTexture("_38", Texture2D.blackTexture);
-        material.SetTexture("_45", Texture2D.whiteTexture);
+        if (material.HasProperty("_45"))
+            material.SetTexture("_45", Texture2D.whiteTexture);
 
         // World-space indirect modules are enabled independently for staged
         // validation. The atlas and volumetric resources are not tied to the
@@ -212,7 +215,8 @@ public sealed class EID4662FullLightPassBinding
             material.SetTexture("_19", Texture2D.blackTexture);
             material.SetTexture("_20", Texture2D.whiteTexture);
             material.SetTexture("_38", Texture2D.blackTexture);
-            material.SetTexture("_45", Texture2D.whiteTexture);
+            if (material.HasProperty("_45"))
+                material.SetTexture("_45", Texture2D.whiteTexture);
         }
 #endif
     }

@@ -651,6 +651,8 @@ namespace UnityEngine.Rendering.Universal.Internal
         {
             Camera camera = renderingData.cameraData.camera;
             var cmd = renderingData.commandBuffer;
+            if (sampledDepth == null || sampledDepth.rt == null)
+                sampledDepth = DepthAttachmentHandle != null ? DepthAttachmentHandle : DepthAttachment;
             if (inputs == null || inputs.Length < 5 || sampledDepth == null || sampledDepth.rt == null)
             {
                 ReportEID3336LightingError(camera, "Missing five GBuffer inputs or sampled depth. Check GBuffer/CopyDepth setup.");
@@ -662,6 +664,7 @@ namespace UnityEngine.Rendering.Universal.Internal
                     ReportEID3336LightingError(camera, "Missing GBuffer" + i);
                     return;
                 }
+            EID3336FiveMRTLightingInputs.Publish(camera, inputs, sampledDepth);
             if (!EID3336LightingParameters.TryPrepare(camera, out var material))
             {
                 ReportEID3336LightingError(camera, "No deferred-lighting provider accepted this camera. Check controller activation and LightPassMode.");
@@ -720,6 +723,8 @@ namespace UnityEngine.Rendering.Universal.Internal
                 material.SetFloat("_EID3336B6NormalTarget", 3f);
                 material.SetFloat("_EID3336B6BaseColorTarget", 4f);
             }
+            EID3336FiveMRTLightingInputs.PublishTextures(
+                camera, sampledDepth.rt, inputs[2].rt, inputs[3].rt, inputs[4].rt);
             if (useEID4662Full)
             {
                 int fullWidth = Mathf.Max(1, renderingData.cameraData.cameraTargetDescriptor.width);

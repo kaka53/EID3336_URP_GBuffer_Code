@@ -1,0 +1,10 @@
+#pragma kernel CSMain
+Texture2D<float> _EID4662_InputHalfB;
+Texture2D<float4> _EID4662_InputRG;
+Texture2D<float4> _EID4662_Field;
+RWTexture2D<float4> _EID4662_Output;
+[numthreads(8,8,1)] void CSMain(uint3 id:SV_DispatchThreadID) {
+    uint2 p=id.xy; uint w,h; _EID4662_Output.GetDimensions(w,h); if(p.x>=w||p.y>=h)return;
+    uint2 hp=min(p/2,uint2(682,383)); float a=_EID4662_InputHalfB.Load(int3(hp,0)); float2 rg=_EID4662_InputRG.Load(int3(hp,0)).xy; float4 f=_EID4662_Field.Load(int3(hp,0));
+    _EID4662_Output[p]=float4(f.rgb*0.5+float3(a,rg.x,rg.y)*0.5,1);
+}

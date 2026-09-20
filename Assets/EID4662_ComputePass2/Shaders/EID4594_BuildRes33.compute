@@ -1,0 +1,22 @@
+#pragma kernel CSMain
+Texture2D<float4> _EID4662_Field;
+Texture2D<float> _EID4662_InputHalfA;
+Texture2D<float> _EID4662_InputDepth;
+Texture2D<float> _EID4662_InputStencil;
+RWTexture2D<float2> _EID4662_Output;
+float4 _EID4662_TargetSize;
+// RenderDoc EID4594 uses LocalSize(64,1,1) and Dispatch(64,23,14).
+// The exact capture uniform block is still supplied by the replay pass; this kernel
+// keeps the resource types and workgroup shape faithful while using the current
+// Unity adaptation for the provisional math.
+[numthreads(64,1,1)] void CSMain(uint3 id:SV_DispatchThreadID) {
+    if (id.x >= (uint)_EID4662_TargetSize.x || id.y >= (uint)_EID4662_TargetSize.y) return;
+    uint2 p=id.xy;
+    float depth=_EID4662_InputDepth.Load(int3(p,0));
+    float stencil=_EID4662_InputStencil.Load(int3(p,0));
+    float field=saturate(_EID4662_Field.Load(int3(p,0)).a);
+    uint mw, mh; _EID4662_InputHalfA.GetDimensions(mw, mh);
+    float mask=saturate(_EID4662_InputHalfA.Load(int3(min(p/2, uint2(mw,mh)-1),0)));
+    float stencilMask=(fmod(floor(stencil*255.0),8.0)>=4.0) ? 1.0 : 0.0;
+    _EID4662_Output[p]=float2(saturate(field*max(mask,0.0001)), depth*(0.5+0.5*stencilMask));
+}

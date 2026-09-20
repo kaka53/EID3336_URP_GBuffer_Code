@@ -32,11 +32,9 @@ namespace UnityEngine.Rendering.Universal.Internal
             if (m_DeferredLights.UseRenderPass)
                 ConfigureInputAttachments(m_DeferredLights.DeferredInputAttachments, m_DeferredLights.DeferredInputIsTransient);
 
-            // TODO: Cannot currently bind depth texture as read-only!
-            if (m_DeferredLights.UseEID3336FiveMRT)
-                ConfigureTarget(lightingAttachment);
-            else
-                ConfigureTarget(lightingAttachment, depthAttachment);
+            // FiveMRT LightPass still needs the GBuffer depth-stencil so
+            // EID4662/EID4666 can stencil-bucket scene vs vegetation.
+            ConfigureTarget(lightingAttachment, depthAttachment);
         }
 
         // ScriptableRenderPass
@@ -61,9 +59,7 @@ namespace UnityEngine.Rendering.Universal.Internal
                 base.profilingSampler))
             {
                 passData.color = builder.UseColorBuffer(color, 0);
-                passData.depth = m_DeferredLights.UseEID3336FiveMRT
-                    ? builder.ReadTexture(depth)
-                    : builder.UseDepthBuffer(depth, DepthAccess.ReadWrite);
+                passData.depth = builder.UseDepthBuffer(depth, DepthAccess.ReadWrite);
                 passData.deferredLights = m_DeferredLights;
                 passData.gbuffer = gbuffer;
                 passData.renderingData = renderingData;

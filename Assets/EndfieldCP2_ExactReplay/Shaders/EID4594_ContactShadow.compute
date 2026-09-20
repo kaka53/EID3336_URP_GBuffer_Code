@@ -1,0 +1,190 @@
+#pragma kernel ContactShadow
+
+Texture2D<float> _Depth;
+SamplerState sampler_Depth;
+RWTexture2D<float2> _Contact;
+
+cbuffer uniforms6
+{
+    float4 _u6[82];
+};
+
+cbuffer uniforms11
+{
+    float4 _u11_0;
+    float4 _u11_1;
+    float4 _u11_2;
+    float4 _u11_3;
+    float4 _u11_4;
+};
+
+groupshared float gs[128];
+
+int2 SSign(int2 v)
+{
+    return int2(v.x > 0 ? 1 : (v.x < 0 ? -1 : 0),
+                v.y > 0 ? 1 : (v.y < 0 ? -1 : 0));
+}
+
+float AdjustDepth(float d0, float d1, float thickRel, bool skyReplace)
+{
+    float ad = abs(d0 - d1);
+    if (ad > abs(d0) * thickRel)
+        return skyReplace ? 1e20 : d0;
+    return d0 - ad;
+}
+
+float SampleDepth(float2 pxCenter, float2 invSize)
+{
+    return _Depth.SampleLevel(sampler_Depth, pxCenter * invSize, 0);
+}
+
+void NeighborOff(bool majorX, float2 p, out float2 nOff)
+{
+    float minor = majorX ? p.y : p.x;
+    float s = frac(minor) - 0.5;
+    float n = s > 0.0 ? 1.0 : -1.0;
+    nOff = majorX ? float2(0.0, n) : float2(n, 0.0);
+}
+
+[numthreads(64, 1, 1)]
+void ContactShadow(uint3 gid : SV_GroupID, uint3 lid3 : SV_GroupThreadID)
+{
+    int lid = (int)lid3.x;
+    int2 maxPx = (int2)(_u11_3.xy + 0.1) - 1;
+    int2 tile = int2(gid.yz) * 64 + (int2)_u11_4.xy;
+
+    float2 pLight = _u11_2.xy;
+    float2 pLightFloor = floor(pLight) + 0.5;
+    float2 pLightFrac = pLight - pLightFloor;
+    float dirSign = _u11_2.w;
+    bool dirPos = dirSign > 0.0;
+
+    int2 tileSign = SSign(tile);
+    bool steep = abs(tile.x + tileSign.y) < abs(tile.y - tileSign.x);
+    int2 stepDiag = int2(steep ? tileSign.y : 0, steep ? 0 : -tileSign.x);
+    int2 pTile = stepDiag * (int)gid.x + tile;
+    float2 pTileF = float2(pTile);
+
+    bool majorX = abs(pTileF.x) > abs(pTileF.y);
+    float major = majorX ? pTileF.x : pTileF.y;
+    float absMajor = abs(major);
+    float fracAlong = majorX ? pLightFrac.x : pLightFrac.y;
+    float aligned = major > 0.0 ? -fracAlong : fracAlong;
+
+    float2 pEnd = pTileF + pLightFloor;
+    float tEnd = (absMajor - 64.0 + aligned) / (absMajor + aligned);
+    float2 pLightOnRay = lerp(pLight, pEnd, tEnd);
+    float2 delta = pEnd - pLightOnRay;
+
+    uint tid = (uint)lid ^ (dirPos ? 0u : 63u);
+    float t = (float)tid * (1.0 / 64.0);
+    float2 p0 = lerp(pEnd, pLightOnRay, t);
+    float distAlong = absMajor - (float)tid + aligned;
+    float negDir = -dirSign;
+
+    float2 p0Floor = floor(p0);
+    float2 p0Center = p0Floor + 0.5;
+    float2 nOff;
+    NeighborOff(majorX, p0, nOff);
+
+    float2 invSize = _u11_3.zw;
+    float d0 = SampleDepth(p0Center, invSize);
+    float d1 = SampleDepth(p0Center + nOff, invSize);
+    float thickRel = _u11_0.y;
+    bool skyReplace = _u11_1.z > 0.0;
+    float dAdj = AdjustDepth(d0, d1, thickRel, skyReplace);
+
+    float2 p1 = p0 + delta * negDir;
+    float2 p1Center = floor(p1) + 0.5;
+    float2 nOff1;
+    NeighborOff(majorX, p1, nOff1);
+    float d2 = SampleDepth(p1Center, invSize);
+    float d3 = SampleDepth(p1Center + nOff1, invSize);
+    float dAdj2 = AdjustDepth(d2, d3, thickRel, skyReplace);
+
+    float zBias = _u11_2.z;
+    float dist2 = distAlong + dirSign * -64.0;
+    gs[lid] = (dAdj - zBias) / distAlong;
+    float slope1 = (dAdj2 - zBias) / dist2;
+    gs[lid + 64] = dist2 > 0.0 ? slope1 : 1e10;
+
+    GroupMemoryBarrierWithGroupSync();
+
+    float slopeSelf = (d0 - zBias) / distAlong;
+    float distNext = distAlong + negDir;
+    float scale = min(distNext, 1.0 / _u11_0.x) * distAlong / abs(d0);
+    float basev = slopeSelf * scale + 1.0;
+
+    float nearMin = 1.0;
+    bool found = false;
+    float hitIndex = 0.0;
+    float walk = distNext;
+    [unroll]
+    for (int k = 1; k <= 4; ++k)
+    {
+        float diff = basev - gs[lid + k] * scale;
+        float sgn = sign(diff);
+        nearMin = min(nearMin, sgn * diff);
+        bool invalid = (walk <= 0.0) || (sgn < 0.0);
+        bool take = invalid && !found;
+        found = take || found;
+        if (k >= 2)
+            hitIndex = take ? (float)(k - 1) : hitIndex;
+        walk += negDir;
+    }
+
+    float f0 = min(1.0, abs(basev - gs[lid + 5] * scale));
+    float f1 = min(1.0, abs(basev - gs[lid + 6] * scale));
+    float f2 = min(1.0, abs(basev - gs[lid + 7] * scale));
+    float f3 = min(1.0, abs(basev - gs[lid + 8] * scale));
+    [unroll]
+    for (int off = 9; off <= 49; off += 4)
+    {
+        f0 = min(f0, abs(basev - gs[lid + off] * scale));
+        f1 = min(f1, abs(basev - gs[lid + off + 1] * scale));
+        f2 = min(f2, abs(basev - gs[lid + off + 2] * scale));
+        f3 = min(f3, abs(basev - gs[lid + off + 3] * scale));
+    }
+    f0 = min(f0, abs(basev - gs[lid + 53] * scale) + 1.0 / 12.0);
+    f1 = min(f1, abs(basev - gs[lid + 54] * scale) + 2.0 / 12.0);
+    f2 = min(f2, abs(basev - gs[lid + 55] * scale) + 3.0 / 12.0);
+    f3 = min(f3, abs(basev - gs[lid + 56] * scale) + 4.0 / 12.0);
+    f0 = min(f0, abs(basev - gs[lid + 57] * scale) + 5.0 / 12.0);
+    f1 = min(f1, abs(basev - gs[lid + 58] * scale) + 6.0 / 12.0);
+    f2 = min(f2, abs(basev - gs[lid + 59] * scale) + 7.0 / 12.0);
+    f3 = min(f3, abs(basev - gs[lid + 60] * scale) + 8.0 / 12.0);
+
+    float hitK = clamp(found ? hitIndex : 60.0, 0.0, 4.0);
+    float2 hitP = p0 + delta * (negDir * hitK * (1.0 / 64.0));
+    float2 hitUv = saturate(hitP * invSize);
+    float hitZ = slopeSelf * (distAlong + negDir * hitK) + zBias;
+    float2 hitNdc = float2(hitUv.x, 1.0 - hitUv.y) * 2.0 - 1.0;
+    float4 hitClip = float4(hitNdc, hitZ, 1.0);
+
+    float2 curUv = p0 * invSize;
+    float2 curNdc = float2(curUv.x, 1.0 - curUv.y) * 2.0 - 1.0;
+    float4 curClip = float4(curNdc, d0, 1.0);
+
+    float4 r0 = _u6[12];
+    float4 r1 = _u6[13];
+    float4 r2 = _u6[14];
+    float4 r3 = _u6[15];
+    float4 c0 = float4(r0.x, r1.x, r2.x, r3.x);
+    float4 c1 = float4(r0.y, r1.y, r2.y, r3.y);
+    float4 c2 = float4(r0.z, r1.z, r2.z, r3.z);
+    float4 c3 = float4(r0.w, r1.w, r2.w, r3.w);
+    float4 dClip = hitClip / dot(c3.zw, hitClip.zw) - curClip / dot(c3.zw, curClip.zw);
+    float packedLen = floor(saturate(length(float3(dot(c0, dClip), dot(c1, dClip), dot(c2, dClip))) * 0.25) * 255.0) * (1.0 / 255.0);
+
+    float wScale = _u11_0.z;
+    float farMean = dot(float4(f0, f1, f2, f3) * wScale + (1.0 - wScale), 0.25);
+    float vis = min(saturate(nearMin * wScale + (1.0 - wScale)), farMean);
+
+    float2 fade = max(abs(curUv - 0.5) * 12.0 - 4.8, 0.0);
+    vis = lerp(1.0, vis, saturate(1.0 - dot(fade, fade)));
+    vis = lerp(1.0, vis, _u11_0.w);
+
+    int2 writePx = clamp((int2)p0Floor, int2(0, 0), maxPx);
+    _Contact[writePx] = float2(vis, packedLen);
+}

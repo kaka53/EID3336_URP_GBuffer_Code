@@ -60,6 +60,14 @@ Shader "Hidden/EID3332Combined/Deferred/EID4662Full"
             ZTest Always
             Blend One Zero
             ColorMask RGBA
+            Stencil
+            {
+                Ref 0
+                Comp Equal
+                ReadMask 7
+                WriteMask 0
+                Pass Keep
+            }
             HLSLPROGRAM
             #pragma target 5.0
             #pragma vertex EID4662FullVertex
@@ -133,6 +141,14 @@ Shader "Hidden/EID3332Combined/Deferred/EID4662Full"
             ZTest Always
             Blend One SrcAlpha
             ColorMask RGBA
+            Stencil
+            {
+                Ref 0
+                Comp Equal
+                ReadMask 7
+                WriteMask 0
+                Pass Keep
+            }
             HLSLPROGRAM
             #pragma target 5.0
             #pragma vertex EID4662FullVertex

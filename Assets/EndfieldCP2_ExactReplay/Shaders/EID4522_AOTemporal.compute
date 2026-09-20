@@ -1,0 +1,142 @@
+#pragma kernel AOTemporal
+
+Texture2D<float> _LinDepth0;
+Texture2D<float> _GTAO;
+Texture2D<float4> _Motion;
+Texture2D<float4> _History;
+RWTexture2D<float4> _Temporal;
+
+cbuffer uniforms8
+{
+    float4 _u8_0;
+    float4 _u8_1;
+    float4 _u8_2;
+    float4 _u8_3;
+    float4 _u8_4;
+};
+
+static const int2 kOff[9] =
+{
+    int2(-1, -1), int2(0, -1), int2(1, -1),
+    int2(-1,  0), int2(0,  0), int2(1,  0),
+    int2(-1,  1), int2(0,  1), int2(1,  1)
+};
+
+static const uint2 kAoSize = uint2(683, 384);
+static const uint2 kMotSize = uint2(1366, 768);
+
+float LoadLinPx(int2 px)
+{
+    px = clamp(px, int2(0, 0), int2(kAoSize) - 1);
+    return _LinDepth0.Load(int3(px, 0));
+}
+
+float SampleLin(float2 uv)
+{
+    float2 p = uv * float2(kAoSize) - 0.5;
+    int2 i = int2(floor(p));
+    float2 f = frac(p);
+    float z00 = LoadLinPx(i);
+    float z10 = LoadLinPx(i + int2(1, 0));
+    float z01 = LoadLinPx(i + int2(0, 1));
+    float z11 = LoadLinPx(i + int2(1, 1));
+    return lerp(lerp(z00, z10, f.x), lerp(z01, z11, f.x), f.y);
+}
+
+float LoadGtaoPx(int2 px)
+{
+    px = clamp(px, int2(0, 0), int2(kAoSize) - 1);
+    return _GTAO.Load(int3(px, 0));
+}
+
+float2 LoadMotionPx(int2 px)
+{
+    px = clamp(px, int2(0, 0), int2(kMotSize) - 1);
+    return _Motion.Load(int3(px, 0)).xy;
+}
+
+float2 SampleMotion(float2 uv)
+{
+    float2 p = uv * float2(kMotSize) - 0.5;
+    int2 i = int2(floor(p));
+    float2 f = frac(p);
+    float2 n00 = LoadMotionPx(i);
+    float2 n10 = LoadMotionPx(i + int2(1, 0));
+    float2 n01 = LoadMotionPx(i + int2(0, 1));
+    float2 n11 = LoadMotionPx(i + int2(1, 1));
+    return lerp(lerp(n00, n10, f.x), lerp(n01, n11, f.x), f.y);
+}
+
+float4 LoadHistPx(int2 px)
+{
+    px = clamp(px, int2(0, 0), int2(kAoSize) - 1);
+    return _History.Load(int3(px, 0));
+}
+
+float4 SampleHistory(float2 uv)
+{
+    float2 p = uv * float2(kAoSize) - 0.5;
+    int2 i = int2(floor(p));
+    float2 f = frac(p);
+    float4 n00 = LoadHistPx(i);
+    float4 n10 = LoadHistPx(i + int2(1, 0));
+    float4 n01 = LoadHistPx(i + int2(0, 1));
+    float4 n11 = LoadHistPx(i + int2(1, 1));
+    return lerp(lerp(n00, n10, f.x), lerp(n01, n11, f.x), f.y);
+}
+
+[numthreads(8, 8, 1)]
+void AOTemporal(uint3 id : SV_DispatchThreadID)
+{
+    uint2 gid = id.xy;
+    uint2 dstSize = (uint2)_u8_4.xy;
+    if (gid.x >= dstSize.x || gid.y >= dstSize.y)
+        return;
+
+    float2 pixelSize = _u8_4.zw;
+    float2 uv = (float2(gid) + 0.5) * pixelSize;
+    float keep = _u8_0.x * 0.0 + _u8_0.y * 0.0 + _u8_0.z * 0.0 + _u8_0.w * 0.0
+               + _u8_1.x * 0.0 + _u8_1.y * 0.0 + _u8_1.z * 0.0 + _u8_1.w * 0.0
+               + _u8_2.x * 0.0 + _u8_2.w * 0.0
+               + _u8_3.x * 0.0 + _u8_3.y * 0.0 + _u8_3.z * 0.0 + _u8_3.w * 0.0;
+
+    float2 packed = SampleMotion(uv);
+    float2 signedDir = sign(packed - 0.5);
+    float2 mag = abs(packed) * 2.0 - 1.0;
+    mag = mag * mag;
+    mag = mag * mag;
+    float2 offset = mag * signedDir;
+    float2 histUV = uv - offset;
+    float motLen = length(offset * _u8_4.xy);
+    float motW = exp(-motLen * _u8_2.z);
+
+    float viewZ = SampleLin(uv);
+    float packedZ = min(viewZ * 0.01, 1.0);
+
+    float4 hist = SampleHistory(histUV);
+    float zW = exp(-abs(packedZ - hist.y) * 500.0);
+
+    float aoMin = 1.0;
+    float aoMax = 0.0;
+    float currAO = 0.0;
+    [unroll]
+    for (int i = 0; i < 9; i++)
+    {
+        float ao = LoadGtaoPx(int2(gid) + kOff[i]);
+        aoMin = min(aoMin, ao);
+        aoMax = max(aoMax, ao);
+        if (i == 4)
+            currAO = ao;
+    }
+
+    float histAO = clamp(hist.x, aoMin, aoMax);
+    float blendW = 0.97 * motW * zW;
+    if (any(histUV < 0.0) || any(histUV > 1.0))
+        blendW = 0.0;
+
+    float outAO = lerp(currAO, histAO, blendW);
+    if (_u8_2.y == 0.0)
+        outAO = currAO;
+
+    _Temporal[gid] = float4(outAO, packedZ, blendW, 0.0) + keep;
+}

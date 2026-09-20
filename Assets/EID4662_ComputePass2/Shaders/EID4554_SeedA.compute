@@ -1,0 +1,14 @@
+#pragma kernel CSMain
+Texture2D<float> _EID4662_InputMask;
+Texture2D<float4> _EID4662_InputPacked;
+Texture2D<float4> _EID4662_InputRG;
+Texture2D<float> _EID4662_InputMip;
+RWTexture2D<float> _EID4662_Output;
+[numthreads(8,8,1)] void CSMain(uint3 id:SV_DispatchThreadID) {
+    uint2 p=id.xy; uint w,h; _EID4662_Output.GetDimensions(w,h); if(p.x>=w||p.y>=h)return;
+    float m=_EID4662_InputMask.Load(int3(p,0));
+    float4 c=_EID4662_InputPacked.Load(int3(p*2,0));
+    float2 rg=_EID4662_InputRG.Load(int3(p,0)).xy;
+    float mip=_EID4662_InputMip.Load(int3(p,0));
+    _EID4662_Output[p]=saturate(m*0.5+dot(c.rgb,float3(0.2126,0.7152,0.0722))*0.25+rg.x*0.125+mip*0.125);
+}

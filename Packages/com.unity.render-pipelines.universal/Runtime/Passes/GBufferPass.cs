@@ -240,13 +240,28 @@ namespace UnityEngine.Rendering.Universal.Internal
                 renderingData.commandBuffer.Clear();
             }
 
-            NativeArray<ShaderTagId> tagValues = new NativeArray<ShaderTagId>(s_ShaderTagValues, Allocator.Temp);
-            NativeArray<RenderStateBlock> stateBlocks = new NativeArray<RenderStateBlock>(s_RenderStateBlocks, Allocator.Temp);
+            if (data.deferredLights.UseEID3336FiveMRT)
+            {
+                // Keep shader stencil (vegetation Ref 33, character Ref 36).
+                // URP OverwriteStencil MaterialMask would replace those bits.
+                context.DrawRenderers(renderingData.cullResults, ref data.drawingSettings, ref data.filteringSettings);
+                // CopyDepth runs after this pass; publish the D32S8 just written.
+                // LightPass later overwrites depth with the sampled copy.
+                EID3336FiveMRTLightingInputs.Publish(
+                    renderingData.cameraData.camera,
+                    data.deferredLights.GbufferAttachments,
+                    data.deferredLights.DepthAttachment);
+            }
+            else
+            {
+                NativeArray<ShaderTagId> tagValues = new NativeArray<ShaderTagId>(s_ShaderTagValues, Allocator.Temp);
+                NativeArray<RenderStateBlock> stateBlocks = new NativeArray<RenderStateBlock>(s_RenderStateBlocks, Allocator.Temp);
 
-            context.DrawRenderers(renderingData.cullResults, ref data.drawingSettings, ref data.filteringSettings, s_ShaderTagUniversalMaterialType, false, tagValues, stateBlocks);
+                context.DrawRenderers(renderingData.cullResults, ref data.drawingSettings, ref data.filteringSettings, s_ShaderTagUniversalMaterialType, false, tagValues, stateBlocks);
 
-            tagValues.Dispose();
-            stateBlocks.Dispose();
+                tagValues.Dispose();
+                stateBlocks.Dispose();
+            }
 
             // The independent EID3336 path is now a normal UniversalGBuffer
             // material draw. Providers are used only as a readback bridge for

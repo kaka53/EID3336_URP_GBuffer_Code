@@ -1,0 +1,8 @@
+#pragma kernel CSMain
+Texture2D<float> _EID4662_Field;
+Texture2D<float4> _EID4662_InputRG;
+RWTexture2D<float> _EID4662_Output;
+[numthreads(8,8,1)] void CSMain(uint3 id:SV_DispatchThreadID) {
+    uint2 p=id.xy; uint w,h; _EID4662_Output.GetDimensions(w,h); if(p.x>=w||p.y>=h)return;
+    float f=_EID4662_Field.Load(int3(p,0)); float2 rg=_EID4662_InputRG.Load(int3(p,0)).xy; _EID4662_Output[p]=saturate(f*0.75+rg.x*0.25);
+}

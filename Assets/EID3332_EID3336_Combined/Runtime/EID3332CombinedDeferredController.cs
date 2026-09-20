@@ -165,9 +165,10 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
 
     public bool UseEID3336FiveMRT(Camera camera)
     {
-        // This is intentionally independent of RendererFeature execution.
-        // UniversalRenderer queries it before allocating GBuffer resources.
-        return useURPFiveMRT && IsForCamera(camera) && sharedMrtController != null;
+        // Topology is selected by useURPFiveMRT. UniversalRenderer also probes
+        // Independent GBuffer materials; do not require sharedMrtController —
+        // EID3336_RenderDocCamera leaves that field empty on purpose.
+        return useURPFiveMRT && IsForCamera(camera);
     }
 
     public bool IsForCamera(Camera camera)

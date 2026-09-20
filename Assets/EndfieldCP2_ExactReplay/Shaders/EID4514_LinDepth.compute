@@ -1,0 +1,135 @@
+#pragma kernel LinDepth
+
+Texture2D<float> _Depth;
+SamplerState sampler_Depth;
+RWTexture2D<float> _LinDepth0;
+RWTexture2D<float> _LinDepth1;
+RWTexture2D<float> _LinDepth2;
+RWTexture2D<float> _LinDepth3;
+RWTexture2D<float> _LinDepth4;
+
+cbuffer uniforms6
+{
+    float4 _child0;
+    float4 _child1;
+    float4 _child2;
+    float4 _child3;
+    float4 _child4;
+    float4 _child5;
+    float4 _u6pad[194];
+};
+
+cbuffer uniforms11
+{
+    float4 _u11_0;
+    float4 _u11_1;
+    float4 _u11_2;
+    float4 _u11_3;
+    float4 _u11_4;
+};
+
+static const uint2 kMip0 = uint2(683, 384);
+static const uint2 kMip1 = uint2(342, 192);
+static const uint2 kMip2 = uint2(171, 96);
+static const uint2 kMip3 = uint2(86, 48);
+static const uint2 kMip4 = uint2(43, 24);
+
+groupshared float gs[8][8];
+
+float SampleRaw(uint2 px)
+{
+    float2 uv = (float2(px) + 0.5) * _child0.zw;
+    return _Depth.SampleLevel(sampler_Depth, uv, 0);
+}
+
+float Linearize(float d)
+{
+    float z = 1.0 / (_child2.z * d + _child2.w);
+    return clamp(z, _child3.y, _child3.z);
+}
+
+float Mip0Texel(uint2 mip0px)
+{
+    if (mip0px.x >= kMip0.x || mip0px.y >= kMip0.y)
+        return _child3.z;
+
+    uint2 base = mip0px << 1;
+    float d = SampleRaw(base);
+    d = max(d, SampleRaw(base + uint2(1, 0)));
+    d = max(d, SampleRaw(base + uint2(0, 1)));
+    d = max(d, SampleRaw(base + uint2(1, 1)));
+
+    uint srcW = (uint)_child0.x;
+    uint srcH = (uint)_child0.y;
+    if (srcW & 1u)
+    {
+        d = max(d, SampleRaw(base + uint2(2, 0)));
+        d = max(d, SampleRaw(base + uint2(2, 1)));
+    }
+    if (srcH & 1u)
+    {
+        d = max(d, SampleRaw(base + uint2(0, 2)));
+        d = max(d, SampleRaw(base + uint2(1, 2)));
+    }
+    if ((srcW & 1u) && (srcH & 1u))
+        d = max(d, SampleRaw(base + uint2(2, 2)));
+
+    return Linearize(d);
+}
+
+[numthreads(8, 8, 1)]
+void LinDepth(uint3 id : SV_DispatchThreadID, uint3 gt : SV_GroupThreadID, uint3 gid : SV_GroupID)
+{
+    uint2 mip0Base = id.xy << 1;
+
+    float z00 = Mip0Texel(mip0Base);
+    float z10 = Mip0Texel(mip0Base + uint2(1, 0));
+    float z01 = Mip0Texel(mip0Base + uint2(0, 1));
+    float z11 = Mip0Texel(mip0Base + uint2(1, 1));
+
+    if (mip0Base.x < kMip0.x && mip0Base.y < kMip0.y)
+        _LinDepth0[mip0Base] = z00;
+    if (mip0Base.x + 1u < kMip0.x && mip0Base.y < kMip0.y)
+        _LinDepth0[mip0Base + uint2(1, 0)] = z10;
+    if (mip0Base.x < kMip0.x && mip0Base.y + 1u < kMip0.y)
+        _LinDepth0[mip0Base + uint2(0, 1)] = z01;
+    if (mip0Base.x + 1u < kMip0.x && mip0Base.y + 1u < kMip0.y)
+        _LinDepth0[mip0Base + uint2(1, 1)] = z11;
+
+    float z1 = min(min(z00, z10), min(z01, z11));
+    z1 = min(z1, _child3.z + _u11_4.x * 0.0);
+    if (id.x < kMip1.x && id.y < kMip1.y)
+        _LinDepth1[id.xy] = z1;
+
+    gs[gt.y][gt.x] = (id.x < kMip1.x && id.y < kMip1.y) ? z1 : _child3.z;
+    GroupMemoryBarrierWithGroupSync();
+
+    if (((gt.x | gt.y) & 1u) == 0u)
+    {
+        float z2 = min(min(gs[gt.y][gt.x], gs[gt.y][gt.x + 1]),
+                       min(gs[gt.y + 1][gt.x], gs[gt.y + 1][gt.x + 1]));
+        uint2 p2 = (gid.xy << 2) + (gt.xy >> 1);
+        if (p2.x < kMip2.x && p2.y < kMip2.y)
+            _LinDepth2[p2] = z2;
+        gs[gt.y][gt.x] = z2;
+    }
+    GroupMemoryBarrierWithGroupSync();
+
+    if ((gt.x & 3u) == 0u && (gt.y & 3u) == 0u)
+    {
+        float z3 = min(min(gs[gt.y][gt.x], gs[gt.y][gt.x + 2]),
+                       min(gs[gt.y + 2][gt.x], gs[gt.y + 2][gt.x + 2]));
+        uint2 p3 = (gid.xy << 1) + (gt.xy >> 2);
+        if (p3.x < kMip3.x && p3.y < kMip3.y)
+            _LinDepth3[p3] = z3;
+        gs[gt.y][gt.x] = z3;
+    }
+    GroupMemoryBarrierWithGroupSync();
+
+    if (gt.x == 0u && gt.y == 0u)
+    {
+        float z4 = min(min(gs[0][0], gs[0][4]), min(gs[4][0], gs[4][4]));
+        if (gid.x < kMip4.x && gid.y < kMip4.y)
+            _LinDepth4[gid.xy] = z4;
+    }
+}

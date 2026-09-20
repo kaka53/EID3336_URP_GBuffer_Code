@@ -1,0 +1,127 @@
+#pragma kernel AOBlur2
+
+Texture2D<float> _Blur;
+Texture2D<float> _GTAOEdge;
+RWTexture2D<float> _GTAO;
+
+cbuffer uniforms8
+{
+    float4 _u8_0;
+    float4 _u8_1;
+    float4 _u8_2;
+    float4 _u8_3;
+    float4 _u8_4;
+};
+
+static const uint2 kAoSize = uint2(683, 384);
+
+float LoadVis(int2 px)
+{
+    px = clamp(px, int2(0, 0), int2(kAoSize) - 1);
+    return _Blur.Load(int3(px, 0));
+}
+
+float LoadEdge(int2 px)
+{
+    px = clamp(px, int2(0, 0), int2(kAoSize) - 1);
+    return _GTAOEdge.Load(int3(px, 0));
+}
+
+float4 GatherVis(int2 pixBase, int2 offset)
+{
+    int2 base = pixBase - 1 + offset;
+    return float4(
+        LoadVis(base + int2(0, 1)),
+        LoadVis(base + int2(1, 1)),
+        LoadVis(base + int2(1, 0)),
+        LoadVis(base + int2(0, 0)));
+}
+
+float4 GatherEdge(int2 pixBase, int2 offset)
+{
+    int2 base = pixBase - 1 + offset;
+    return float4(
+        LoadEdge(base + int2(0, 1)),
+        LoadEdge(base + int2(1, 1)),
+        LoadEdge(base + int2(1, 0)),
+        LoadEdge(base + int2(0, 0)));
+}
+
+float Dec(uint packed, uint shift)
+{
+    return saturate((float)((packed >> shift) & 3u) * 0.3333);
+}
+
+[numthreads(8, 8, 1)]
+void AOBlur2(uint3 id : SV_DispatchThreadID)
+{
+    int2 pixBase = int2(id.xy) * int2(2, 1);
+    float beta = _u8_2.x;
+
+    float4 e00 = GatherEdge(pixBase, int2(0, 0));
+    float4 e20 = GatherEdge(pixBase, int2(2, 0));
+    float4 e12 = GatherEdge(pixBase, int2(1, 2));
+    float4 v00 = GatherVis(pixBase, int2(0, 0));
+    float4 v20 = GatherVis(pixBase, int2(2, 0));
+    float4 v02 = GatherVis(pixBase, int2(0, 2));
+    float4 v22 = GatherVis(pixBase, int2(2, 2));
+
+    float vis0[4] = { v00.x, v00.y, v00.z, v00.w };
+    float vis1[4] = { v20.x, v20.y, v20.z, v20.w };
+    float vis2[4] = { v02.x, v02.y, v02.z, v02.w };
+    float vis3[4] = { v22.x, v22.y, v22.z, v22.w };
+
+    [unroll]
+    for (int side = 0; side < 2; ++side)
+    {
+        int2 px = int2(pixBase.x + side, pixBase.y);
+        bool s0 = side == 0;
+
+        uint u193 = (uint)((s0 ? e00.x : e00.y) * 255.5);
+        float4 p193 = float4(0.0, Dec(u193, 4), Dec(u193, 2), Dec(u193, 0));
+
+        uint u211 = (uint)((s0 ? e00.z : e20.w) * 255.5);
+        float4 p211 = float4(Dec(u211, 6), Dec(u211, 4), 0.0, Dec(u211, 0));
+
+        uint u229 = (uint)((s0 ? e20.x : e20.y) * 255.5);
+        float4 p229 = float4(Dec(u229, 6), 0.0, Dec(u229, 2), Dec(u229, 0));
+
+        uint u248 = (uint)((s0 ? e12.w : e12.z) * 255.5);
+        float4 p248 = float4(Dec(u248, 6), Dec(u248, 4), Dec(u248, 2), 0.0);
+
+        uint u268 = (uint)((s0 ? e00.y : e20.x) * 255.5);
+        float4 w = float4(Dec(u268, 6), Dec(u268, 4), Dec(u268, 2), Dec(u268, 0));
+        w *= float4(p193.y, p229.x, p211.w, p248.z);
+        float leftover = saturate(1.5 - dot(w, 1.0)) * 0.3333;
+        w = saturate(w + leftover);
+
+        float d0 = 0.425 * (w.x * p193.z + w.z * p211.x);
+        float d1 = 0.425 * (w.z * p211.y + w.y * p229.z);
+        float d2 = 0.425 * (w.w * p248.x + w.x * p193.w);
+        float d3 = 0.425 * (w.y * p229.w + w.w * p248.y);
+
+        float center = s0 ? vis0[1] : vis1[0];
+        float nL = s0 ? vis0[0] : vis0[1];
+        float nYm = s0 ? vis0[2] : vis1[3];
+        float nR = s0 ? vis1[0] : vis1[1];
+        float nYp = s0 ? vis2[2] : vis3[3];
+        float nLYm = s0 ? vis0[3] : vis0[2];
+        float nRYp = s0 ? vis3[3] : vis3[2];
+        float nRYm = s0 ? vis1[3] : vis1[2];
+        float nLYp = s0 ? vis2[3] : vis2[2];
+
+        float num = center * beta
+            + w.x * nL
+            + w.y * nR
+            + w.z * nYm
+            + w.w * nYp
+            + d0 * nLYm
+            + d1 * nRYm
+            + d2 * nLYp
+            + d3 * nRYp;
+        float den = beta + w.x + w.y + w.z + w.w + d0 + d1 + d2 + d3;
+
+        if ((uint)px.x < kAoSize.x && (uint)px.y < kAoSize.y)
+            _GTAO[uint2(px)] = (num / den) * 1.5;
+    }
+}

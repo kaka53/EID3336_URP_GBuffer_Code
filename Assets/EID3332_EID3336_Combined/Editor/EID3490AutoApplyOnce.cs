@@ -2,20 +2,11 @@
 using UnityEditor;
 using UnityEngine;
 
-[InitializeOnLoad]
 static class EID3490AutoApplyOnce
 {
-    const string Key = "EID3490_PS209989_AutoApply_20260830_v7";
-
-    static EID3490AutoApplyOnce()
-    {
-        EditorApplication.delayCall += Apply;
-    }
-
+    [MenuItem("Tools/EID3332+3336/Apply EID3490 To Combined Scene")]
     static void Apply()
     {
-        if (SessionState.GetBool(Key, false)) return;
-        SessionState.SetBool(Key, true);
         try
         {
             EID3490CombinedImporter.ImportIntoCombinedScene();

@@ -1,0 +1,21 @@
+#pragma kernel CSMain
+Texture2D<float4> _EID4662_InputColor;
+Texture2D<float> _EID4662_InputHalfA;
+Texture2D<float> _EID4662_InputHalfB;
+Texture2D<float4> _EID4662_InputPackedFull;
+Texture2D<float4> _EID4662_InputPackedHalf;
+RWTexture2D<float4> _EID4662_OutputA;
+RWTexture2D<float4> _EID4662_OutputB;
+RWTexture2D<float> _EID4662_OutputC;
+float4 _EID4662_TargetSize;
+[numthreads(8,8,1)] void CSMain(uint3 id:SV_DispatchThreadID) {
+    uint2 p=id.xy; uint2 da,db,dc; _EID4662_OutputA.GetDimensions(da.x,da.y); _EID4662_OutputB.GetDimensions(db.x,db.y); _EID4662_OutputC.GetDimensions(dc.x,dc.y);
+    if (p.x>=da.x || p.y>=da.y) return;
+    float a=_EID4662_InputHalfA.Load(int3(p,0));
+    float b=_EID4662_InputHalfB.Load(int3(p,0));
+    float4 pf=_EID4662_InputPackedHalf.Load(int3(p,0));
+    float v=saturate(0.5*(a+b));
+    _EID4662_OutputA[p]=float4(v,pf.x,pf.y,0);
+    if(p.x<db.x&&p.y<db.y) _EID4662_OutputB[p]=float4(v,pf.z,0,1);
+    if(p.x<dc.x&&p.y<dc.y) _EID4662_OutputC[p]=saturate(v+pf.w*0.125);
+}
