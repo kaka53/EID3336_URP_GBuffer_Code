@@ -1,0 +1,66 @@
+#pragma kernel CSMain
+
+Texture2D<float4> _Src;
+SamplerState sampler_Src;
+RWTexture2D<float4> _Dst;
+
+cbuffer CP3Uniforms5
+{
+    float4 _5_raw[200];
+};
+
+cbuffer CP3Threshold13
+{
+    float4 _13_m0;
+    float4 _13_m1;
+    float4 _13_m2;
+    float4 _13_m3;
+};
+
+static const float3 kKaris[13] =
+{
+    float3(0.0, 0.0, 4.0),
+    float3(-2.0, -2.0, 1.0),
+    float3(2.0, -2.0, 1.0),
+    float3(2.0, 2.0, 1.0),
+    float3(-2.0, 2.0, 1.0),
+    float3(-2.0, 0.0, 2.0),
+    float3(2.0, 0.0, 2.0),
+    float3(0.0, 2.0, 2.0),
+    float3(0.0, -2.0, 2.0),
+    float3(-1.0, 1.0, 4.0),
+    float3(1.0, 1.0, 4.0),
+    float3(-1.0, -1.0, 4.0),
+    float3(-1.0, 1.0, 4.0)
+};
+
+float NMax(float a, float b)
+{
+    return isnan(b) ? a : (isnan(a) ? b : max(a, b));
+}
+
+[numthreads(8, 8, 1)]
+void CSMain(uint3 id : SV_DispatchThreadID)
+{
+    float2 pixel = float2(id.xy);
+    float2 uv = (pixel + 0.5) * _13_m0.zw;
+    float weightSum = 0.0;
+    float3 colorSum = 0.0;
+
+    [loop]
+    for (int i0 = 0; i0 < 13; i0++)
+    {
+        float4 s = _Src.SampleLevel(sampler_Src, uv + kKaris[i0].xy * _5_raw[0].zw, 0.0);
+        float peak = NMax(NMax(s.x, s.y), s.z);
+        float shoulder = clamp(peak - _13_m1.y, 0.0, _13_m1.z);
+        float compressed = NMax(((_13_m1.w * shoulder) * shoulder), peak - _13_m1.x);
+        float3 exposed = (s.xyz * (compressed / NMax(peak, 1e-4))) * _5_raw[27].x;
+        float karis = 1.0 / (dot(exposed, float3(0.21267290413379669189453125, 0.715152204036712646484375, 0.072175003588199615478515625)) + 1.0);
+        weightSum += kKaris[i0].z * karis;
+        colorSum += (exposed * kKaris[i0].z) * karis;
+    }
+
+    uint2 limit = uint2(_13_m0.xy);
+    float inside = all(bool2(id.x <= limit.x, id.y <= limit.y)) ? 1.0 : 0.0;
+    _Dst[id.xy] = float4((colorSum / weightSum) * inside, 1.0);
+}

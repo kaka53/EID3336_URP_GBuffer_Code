@@ -1,0 +1,100 @@
+#pragma kernel CSMain
+
+Texture2D<float4> _Src;
+SamplerState sampler_Src;
+RWTexture2D<float4> _Dst;
+
+cbuffer CP3Downsample13
+{
+    float4 _13_m0;
+};
+
+groupshared uint _14[128];
+groupshared uint _15[128];
+groupshared uint _16[128];
+
+uint PackHalf2(float2 value)
+{
+    uint2 packed = f32tof16(value);
+    return packed.x | (packed.y << 16);
+}
+
+float UnpackHalfLo(uint value)
+{
+    return f16tof32(value & 0xffff);
+}
+
+[numthreads(8, 8, 1)]
+void CSMain(uint3 groupId : SV_GroupID, uint3 localId : SV_GroupThreadID, uint3 id : SV_DispatchThreadID)
+{
+    float2 tap = float2(int2(((localId.xy << uint2(1u, 1u)) + (groupId.xy << uint2(3u, 3u))) - uint2(4u, 4u)));
+    float4 s00 = _Src.SampleLevel(sampler_Src, (tap + 0.5) * _13_m0.zw, 0.0);
+    float4 s10 = _Src.SampleLevel(sampler_Src, (tap + float2(1.5, 0.5)) * _13_m0.zw, 0.0);
+    float4 s01 = _Src.SampleLevel(sampler_Src, (tap + float2(0.5, 1.5)) * _13_m0.zw, 0.0);
+    float4 s11 = _Src.SampleLevel(sampler_Src, (tap + 1.5) * _13_m0.zw, 0.0);
+
+    uint row = localId.y << 4u;
+    uint slot = localId.x + row;
+    _14[slot] = PackHalf2(float2(s00.x, 0.0)) | (PackHalf2(float2(s10.x, 0.0)) << 16u);
+    _15[slot] = PackHalf2(float2(s00.y, 0.0)) | (PackHalf2(float2(s10.y, 0.0)) << 16u);
+    _16[slot] = PackHalf2(float2(s00.z, 0.0)) | (PackHalf2(float2(s10.z, 0.0)) << 16u);
+    uint slotLo = slot + 8u;
+    _14[slotLo] = PackHalf2(float2(s01.x, 0.0)) | (PackHalf2(float2(s11.x, 0.0)) << 16u);
+    _15[slotLo] = PackHalf2(float2(s01.y, 0.0)) | (PackHalf2(float2(s11.y, 0.0)) << 16u);
+    _16[slotLo] = PackHalf2(float2(s01.z, 0.0)) | (PackHalf2(float2(s11.z, 0.0)) << 16u);
+    GroupMemoryBarrierWithGroupSync();
+
+    uint store = row + (localId.x << 1u);
+    uint gather = (row + localId.x) + (localId.x & 4u);
+    uint r0 = _14[gather];
+    uint g0 = _15[gather];
+    uint b0 = _16[gather];
+    float3 c0 = float3(UnpackHalfLo(r0), UnpackHalfLo(g0), UnpackHalfLo(b0));
+    float3 c1 = float3(UnpackHalfLo(r0 >> 16u), UnpackHalfLo(g0 >> 16u), UnpackHalfLo(b0 >> 16u));
+    uint r1 = _14[gather + 1u];
+    uint g1 = _15[gather + 1u];
+    uint b1 = _16[gather + 1u];
+    float3 c2 = float3(UnpackHalfLo(r1), UnpackHalfLo(g1), UnpackHalfLo(b1));
+    float3 c3 = float3(UnpackHalfLo(r1 >> 16u), UnpackHalfLo(g1 >> 16u), UnpackHalfLo(b1 >> 16u));
+    uint r2 = _14[gather + 2u];
+    uint g2 = _15[gather + 2u];
+    uint b2 = _16[gather + 2u];
+    float3 c4 = float3(UnpackHalfLo(r2), UnpackHalfLo(g2), UnpackHalfLo(b2));
+    float3 c5 = float3(UnpackHalfLo(r2 >> 16u), UnpackHalfLo(g2 >> 16u), UnpackHalfLo(b2 >> 16u));
+    uint r3 = _14[gather + 3u];
+    uint g3 = _15[gather + 3u];
+    uint b3 = _16[gather + 3u];
+    float3 c6 = float3(UnpackHalfLo(r3), UnpackHalfLo(g3), UnpackHalfLo(b3));
+    float3 c7 = float3(UnpackHalfLo(r3 >> 16u), UnpackHalfLo(g3 >> 16u), UnpackHalfLo(b3 >> 16u));
+    uint r4 = _14[gather + 4u];
+    uint g4 = _15[gather + 4u];
+    uint b4 = _16[gather + 4u];
+    float3 c8 = float3(UnpackHalfLo(r4), UnpackHalfLo(g4), UnpackHalfLo(b4));
+    float3 c9 = float3(UnpackHalfLo(r4 >> 16u), UnpackHalfLo(g4 >> 16u), UnpackHalfLo(b4 >> 16u));
+
+    float3 h0 = ((((c4 * 0.2734375) + ((c3 + c5) * 0.21875)) + ((c2 + c6) * 0.109375)) + ((c1 + c7) * 0.03125)) + ((c0 + c8) * 0.00390625);
+    _14[store] = asuint(h0.x);
+    _15[store] = asuint(h0.y);
+    _16[store] = asuint(h0.z);
+    float3 h1 = ((((c5 * 0.2734375) + ((c4 + c6) * 0.21875)) + ((c3 + c7) * 0.109375)) + ((c2 + c8) * 0.03125)) + ((c1 + c9) * 0.00390625);
+    _14[store + 1u] = asuint(h1.x);
+    _15[store + 1u] = asuint(h1.y);
+    _16[store + 1u] = asuint(h1.z);
+    GroupMemoryBarrierWithGroupSync();
+
+    uint base = (localId.y << 3u) + localId.x;
+    float3 v0 = asfloat(uint3(_14[base], _15[base], _16[base]));
+    float3 v1 = asfloat(uint3(_14[base + 8u], _15[base + 8u], _16[base + 8u]));
+    float3 v2 = asfloat(uint3(_14[base + 16u], _15[base + 16u], _16[base + 16u]));
+    float3 v3 = asfloat(uint3(_14[base + 24u], _15[base + 24u], _16[base + 24u]));
+    float3 v4 = asfloat(uint3(_14[base + 32u], _15[base + 32u], _16[base + 32u]));
+    float3 v5 = asfloat(uint3(_14[base + 40u], _15[base + 40u], _16[base + 40u]));
+    float3 v6 = asfloat(uint3(_14[base + 48u], _15[base + 48u], _16[base + 48u]));
+    float3 v7 = asfloat(uint3(_14[base + 56u], _15[base + 56u], _16[base + 56u]));
+    float3 v8 = asfloat(uint3(_14[base + 64u], _15[base + 64u], _16[base + 64u]));
+    float3 filtered = ((((v4 * 0.2734375) + ((v3 + v5) * 0.21875)) + ((v2 + v6) * 0.109375)) + ((v1 + v7) * 0.03125)) + ((v0 + v8) * 0.00390625);
+
+    uint2 limit = uint2(_13_m0.xy);
+    float inside = all(bool2(id.x < limit.x, id.y < limit.y)) ? 1.0 : 0.0;
+    _Dst[id.xy] = float4(filtered * inside, 1.0);
+}

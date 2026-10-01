@@ -21,6 +21,7 @@ float4 _InstanceChild7;
 float4 _InstanceChild8;
 float4 _ScanGlobals;
 float _UseBakedSkinning;
+float _AlphaCutoff;
 CBUFFER_END
 
 struct Attributes215537
@@ -128,6 +129,7 @@ GBufferOutput215538 EID215538Fragment(Varyings215537 input, bool isFrontFace : S
     float2 uvNormal = lerp(input.uv0, input.uv1, _P03.x) * _P12.xy + _P12.zw;
     float mip = _ScanGlobals.x;
     float4 albedoSample = SAMPLE_TEXTURE2D_BIAS(_Res33, sampler_Res33, uvAlbedo, mip);
+    clip(albedoSample.a - 0.5);
     float4 normalSample = SAMPLE_TEXTURE2D_BIAS(_Res35, sampler_Res35, uvNormal, _P03.y + mip);
 
     float2 nxyRaw = DeadzoneNormalXY(normalSample.xy);

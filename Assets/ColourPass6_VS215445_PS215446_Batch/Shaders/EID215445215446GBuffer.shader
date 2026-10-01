@@ -49,5 +49,23 @@ Shader "EID/URP/VS215445_PS215446_GBuffer"
             #include "EID215445215446GBuffer.hlsl"
             ENDHLSL
         }
+        Pass
+        {
+            Name "VS215989_PS215990_EID4673CharacterForward"
+            Tags { "LightMode"="EID4673CharacterForwardOff" }
+            Cull Back
+            ZWrite On
+            ZTest Equal
+            Blend Off
+            ColorMask RGB
+            HLSLPROGRAM
+            #pragma target 5.0
+            #pragma exclude_renderers gles gles3 glcore
+            #pragma vertex EID215445Vertex
+            #pragma fragment EID4673ForwardFragment
+            #include "EID215445215446GBuffer.hlsl"
+            // isolate EID4730: this family LightMode off
+            ENDHLSL
+        }
     }
 }

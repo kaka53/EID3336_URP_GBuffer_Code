@@ -15,7 +15,16 @@ float4 _InstancePacked;
 float _EID215440MipBias;
 float _UseBakedSkinning;
 float _StencilRef;
+float4 _FS49_00; float4 _FS49_01; float4 _FS49_02; float4 _FS49_03;
+float4 _FS49_04; float4 _FS49_05; float4 _FS49_06; float4 _FS49_07;
+float4 _FS49_08; float4 _FS49_09; float4 _FS49_10; float4 _FS49_11;
+float4 _FS49_12; float4 _FS49_13; float4 _FS49_14; float4 _FS49_15;
+float4 _FS49_16; float4 _FS49_17; float4 _FS49_18; float4 _FS49_19;
+float4 _FS49_20; float4 _FS49_21; float4 _FS49_22; float4 _FS49_23;
+float4 _FS49_24;
 CBUFFER_END
+
+#include "../../EID4673_CharacterForward/Shaders/EID215980Lighting.hlsl"
 
 struct Attributes215439
 {
@@ -34,6 +43,7 @@ struct Varyings215439
     float3 normalWS : TEXCOORD1;
     float3 currentClipXYW : TEXCOORD2;
     float3 previousClipXYW : TEXCOORD3;
+    float3 positionWS : TEXCOORD4;
 };
 
 float3 DecodeOctNormal215439(uint packed)
@@ -66,6 +76,7 @@ Varyings215439 EID215439Vertex(Attributes215439 input)
     o.normalWS = normalWS;
     o.currentClipXYW = clip.xyw;
     o.previousClipXYW = clip.xyw;
+    o.positionWS = positionWS;
     return o;
 }
 
@@ -110,6 +121,13 @@ GBufferOutput215440 EID215440Fragment(Varyings215439 input, bool isFrontFace : S
     o.rt3 = float4(oct, 0.0, 0.7);
     o.rt4 = float4(tinted, 1.0);
     return o;
+}
+
+float4 EID215980Fragment(Varyings215439 input, bool isFrontFace : SV_IsFrontFace) : SV_Target0
+{
+    float4 albedoSample = SAMPLE_TEXTURE2D_BIAS(_Res24, sampler_Res24, input.uv, _EID215440MipBias);
+    float3 albedo = albedoSample.rgb * _P06.rgb;
+    return float4(EID215980LitColor(albedo, input.positionWS, input.normalWS, isFrontFace, input.positionCS), 1.0);
 }
 
 #endif

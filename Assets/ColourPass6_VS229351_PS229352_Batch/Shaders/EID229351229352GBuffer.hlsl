@@ -6,6 +6,8 @@
 TEXTURE2D(_Res25); SAMPLER(sampler_Res25);
 TEXTURE2D(_Res27); SAMPLER(sampler_Res27);
 TEXTURE2D(_Res31); SAMPLER(sampler_Res31);
+TEXTURE2D(_Res32); SAMPLER(sampler_Res32);
+TEXTURE2D(_Res33); SAMPLER(sampler_Res33);
 
 CBUFFER_START(UnityPerMaterial)
 float4 _P00; float4 _P01; float4 _P02; float4 _P03;
@@ -17,9 +19,15 @@ float4 _P20; float4 _P21;
 float4 _SunDir;
 float4 _WindA;
 float4 _WindB;
+float4 _TerrainOrigin32;
+float4 _TerrainOrigin33;
+float4 _TerrainPad;
+float4 _CliffParams;
+float4 _CliffRise;
 float _WindGate;
 float _PrevBlend;
 float _EID229352MipBias;
+float _AlphaCutoff;
 CBUFFER_END
 
 struct Attributes229351
@@ -142,6 +150,39 @@ float3 EvaluateWind229351(float3 posOS, float3 posWS, float3 instanceT, float in
     return amp > 0.01 ? total : 0.0;
 }
 
+float3 SampleTerrain229351(Texture2D tex, SamplerState samp, float3 mixPos, float4 origin, float3 worldPos, float3 windVecWS, float loc3y)
+{
+    float2 delta = mixPos.xz - origin.xz;
+    float2 scaled = delta * 0.0313;
+    if (any(abs(scaled) > 0.5))
+        return 0.0;
+    float2 uv = scaled + 0.5;
+    float4 s = tex.SampleLevel(samp, uv, 0);
+    if (s.x > 0.99)
+        return 0.0;
+    float height = (s.x - 0.5) * 10.0 + origin.y;
+    if (mixPos.y > height + _TerrainPad.x + 0.2 || mixPos.y < height - 0.5)
+        return 0.0;
+    float sy = tex.SampleLevel(samp, scaled + float2(0.5039, 0.5000), 0).y;
+    float sz = tex.SampleLevel(samp, scaled + float2(0.5000, 0.5039), 0).y;
+    float4 h4 = (float4(s.y, s.y, sy, sz) - 0.5) * 10.0 + origin.yyyy;
+    float3 n = normalize(float3(h4.z - h4.y, 0.0010, h4.w - h4.x));
+    float3 h = frac(windVecWS.xzx * 0.1031);
+    float nse = frac(dot(h, h.yzx + 33.33));
+    float nseB = frac((h.x + nse + h.y) * (h.z + nse));
+    float rise = ((s.y - 0.5) * 10.0 + origin.y) - height;
+    float t = saturate((rise / max(_CliffRise.x + nseB, 1e-5)) * 2.0);
+    float keep = 1.0 - t;
+    float cosTerm = cos(t * _CliffParams.z * _CliffRise.x) * keep * keep * keep;
+    float drop = max(worldPos.y - height, 0.0) * _CliffParams.w * keep;
+    float3 posY = float3(worldPos.x, worldPos.y - drop, worldPos.z);
+    float3 lateral = float3(n.x, 0.0, n.z) * cosTerm * max(worldPos.y - height, 0.0) * _CliffParams.y * loc3y;
+    float3 displaced = posY + lateral;
+    float3 dir = displaced - windVecWS;
+    dir *= rsqrt(max(dot(dir, dir), 0.0));
+    return windVecWS + dir * length(posY - windVecWS) - worldPos;
+}
+
 Varyings229351 EID229351Vertex(Attributes229351 input)
 {
     Varyings229351 o;
@@ -154,19 +195,28 @@ Varyings229351 EID229351Vertex(Attributes229351 input)
     float3 instanceT = TransformObjectToWorld(float3(0.0, 0.0, 0.0));
     float instanceScale = length(TransformObjectToWorldDir(float3(1.0, 0.0, 0.0)));
     float3 positionWS = TransformObjectToWorld(input.position);
-    positionWS += EvaluateWind229351(input.position, positionWS, instanceT, instanceScale, input.input3, input.input6.y, windVecOS, _WindA) * (1.0 - _PrevBlend);
+    float3 windVecWS = TransformObjectToWorld(windVecOS);
+    float fade = 1.0 - _PrevBlend;
+    float3 mixTerrain = lerp(windVecWS, positionWS, _CliffParams.x);
+    float3 windNow = EvaluateWind229351(input.position, positionWS, instanceT, instanceScale, input.input3, input.input6.y, windVecOS, _WindA);
+    float3 windPrev = EvaluateWind229351(input.position, positionWS, instanceT, instanceScale, input.input3, input.input6.y, windVecOS, _WindB);
+    float3 t32 = 0.0;
+    float3 t33 = 0.0;
+    float3 worldNow = positionWS + (windNow + t32) * fade;
+    float3 worldPrev = positionWS + (windPrev + t33) * fade;
 
     float3 normalWS = normalize(TransformObjectToWorldNormal(normalOS));
     float3 tangentWS = normalize(TransformObjectToWorldDir(tangentOS.xyz));
-    float4 clip = TransformWorldToHClip(positionWS);
+    float4 clip = TransformWorldToHClip(worldNow);
+    float4 prevClip = TransformWorldToHClip(worldPrev);
 
     o.positionCS = clip;
-    o.uv0 = input.input4;
+    o.uv0 = float2(input.input4.x, 1.0 - input.input4.y);
     o.normalWS = normalWS;
     o.tangentWS = float4(tangentWS, tangentOS.w * GetOddNegativeScale());
     o.loc3 = input.input3;
     o.currentClipXYW = clip.xyw;
-    o.previousClipXYW = clip.xyw;
+    o.previousClipXYW = prevClip.xyw;
     return o;
 }
 
@@ -190,21 +240,22 @@ GBufferOutput229352 EID229352Fragment(Varyings229351 input, bool isFrontFace : S
 
     float loc3x = input.loc3.x;
     float faceSign = isFrontFace ? 1.0 : -1.0;
-    float twoSided = lerp(1.0, faceSign, _P01.z);
+    float twoSided = faceSign;
 
     float mip = _EID229352MipBias;
     float4 albedoSample = SAMPLE_TEXTURE2D_BIAS(_Res25, sampler_Res25, input.uv0, mip);
+    clip(albedoSample.a - 0.5);
     float3 albedo = lerp(saturate(albedoSample.rgb * _P15.rgb * _P06.x), _P15.rgb, _P05.w);
 
     float4 extraSample = SAMPLE_TEXTURE2D_BIAS(_Res27, sampler_Res27, input.uv0, mip);
     float4 packed = float4(extraSample.x, extraSample.y, 0.0, extraSample.x);
     float2 nxyRaw = packed.wy * 2.0 - 1.0;
     float nz = sqrt(saturate(1.0 - dot(nxyRaw, nxyRaw)));
-    float2 nxy = nxyRaw * _P01.x * twoSided;
+    float2 nxy = nxyRaw * _P01.x;
     float3 nts = float3(nxy, nz);
-    float3 tsNormalWS = normalize(mul(nts, tbn)) * twoSided;
+    float3 tsNormalWS = normalize(mul(nts, tbn));
     float3 normalWS = lerp(tsNormalWS, n, _P05.z);
-    normalWS = normalize(normalWS);
+    normalWS = normalize(normalWS) * twoSided;
 
     float extraW = saturate((1.0 - extraSample.w) * _P17.w * 10.0);
     float h = pow(saturate(lerp(tsNormalWS.y, n.y, _P16.z) + 0.5 + _P16.x), _P16.y);

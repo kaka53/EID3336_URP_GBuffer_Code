@@ -212,7 +212,11 @@ public static class ColourPass6VS229351PS229352BatchImporter
         mesh.SetIndexBufferParams(indices32.Length, IndexFormat.UInt32);
         mesh.SetIndexBufferData(indices32, 0, 0, indices32.Length, MeshUpdateFlags.DontRecalculateBounds | MeshUpdateFlags.DontValidateIndices);
         mesh.subMeshCount = 1;
-        mesh.SetSubMesh(0, new SubMeshDescriptor(0, indices32.Length, MeshTopology.Triangles), MeshUpdateFlags.DontRecalculateBounds | MeshUpdateFlags.DontValidateIndices);
+        mesh.SetSubMesh(0, new SubMeshDescriptor(0, indices32.Length, MeshTopology.Triangles)
+        {
+            firstVertex = 0,
+            vertexCount = count
+        }, MeshUpdateFlags.DontRecalculateBounds | MeshUpdateFlags.DontValidateIndices);
         mesh.RecalculateBounds();
         AssetDatabase.CreateAsset(mesh, path);
 
@@ -243,16 +247,29 @@ public static class ColourPass6VS229351PS229352BatchImporter
         m.SetVector("_SunDir", ReadVector4(wind, 1296));
         byte[] u20 = ReadCB(p, "VS", "uniforms20");
         m.SetFloat("_PrevBlend", u20.Length >= 20 ? ReadFloat(u20, 16) : 0f);
+        Matrix4x4 inst = ReadInstanceMatrix(p, 0);
+        Vector4 cliffOrigin = new Vector4(inst.m03, 98.94354f, inst.m23, 0f);
+        m.SetVector("_TerrainOrigin32", cliffOrigin);
+        m.SetVector("_TerrainOrigin33", cliffOrigin);
+        m.SetVector("_TerrainPad", new Vector4(16f, 1.66f, 1.66f, 0f));
+        m.SetVector("_CliffParams", new Vector4(1f, 0.15f, 7.5f, 0.05f));
+        m.SetVector("_CliffRise", new Vector4(5f, 0f, 0f, 0f));
+        m.SetFloat("_AlphaCutoff", 0.5f);
         Texture albedo = LoadTexture(p, "res25");
         Texture extra = LoadTexture(p, "res27");
         Texture windTex = LoadTexture(p, "res31");
+        Texture cliff = AssetDatabase.LoadAssetAtPath<Texture>(Root + "/Textures/EID3755_CliffHeight.png");
         if (albedo == null || extra == null || windTex == null)
             throw new FileNotFoundException("EID" + p.eid + " res25/res27/res31 texture binding is incomplete.");
+        if (cliff == null)
+            throw new FileNotFoundException("EID" + p.eid + " cliff height EID3755_CliffHeight.png missing.");
         m.SetTexture("_Res25", albedo);
         m.SetTexture("_Res27", extra);
         m.SetTexture("_Res31", windTex);
+        m.SetTexture("_Res32", cliff);
+        m.SetTexture("_Res33", cliff);
         EditorUtility.SetDirty(m);
-        report.AppendLine("EID" + p.eid + ": material res25=RID" + Rid(p, "res25") + " res27=RID" + Rid(p, "res27") + " res31=RID" + Rid(p, "res31") + " PS uniforms30=" + local.Length + "B");
+        report.AppendLine("EID" + p.eid + ": material res25=RID" + Rid(p, "res25") + " res27=RID" + Rid(p, "res27") + " res31=RID" + Rid(p, "res31") + " cutout=rid256294.a _AlphaCutoff=0.5 PS uniforms30=" + local.Length + "B");
         return m;
     }
 
@@ -337,7 +354,7 @@ public static class ColourPass6VS229351PS229352BatchImporter
         report.AppendLine("vertexAttributes=COMPLETE_7_OF_7");
         report.AppendLine("resourcePolicy=RID_DEDUPLICATED_UNIQUE_MATERIAL_REUSE_EXISTING_ASSETS");
         report.AppendLine("validation=PASS");
-        audit.Insert(0, "# VS229351 / PS229352 Vertex Attribute Audit\n\n- Date: `" + DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "`\n- EIDs: `60.1` (`3755`)\n- Layout variants: `1` (`812bd8531503c10d`)\n- Unique source meshes: `1`\n- Instances: `1` via uniforms27 stride 256, per-GO Transform\n- Packed `_input1` on `NORMAL.x` oct 0.0020; live Unity VP; Combined wind RID14988; unique res25/res27; DXT5nm `.wy`; no clip; stencil 33; ZTest Equal; ZWrite Off; Queue Geometry+10; PS uniforms30 352B; encode 0.0010; skip skin\n\n");
+        audit.Insert(0, "# VS229351 / PS229352 Vertex Attribute Audit\n\n- Date: `" + DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "`\n- EIDs: `60.1` (`3755`)\n- Layout variants: `1` (`812bd8531503c10d`)\n- Unique source meshes: `1`\n- Instances: `1` via uniforms27 stride 256, per-GO Transform\n- Packed `_input1` on `NORMAL.x` oct 0.0020; live Unity VP; Combined wind RID14988; unique res25/res27; DXT5nm `.wy`; FS clip rid256294.a `_AlphaCutoff=0.5`; stencil 33; ZTest LEqual; ZWrite On; Queue AlphaTest; PS uniforms30 352B; encode 0.0010; skip skin\n\n");
     }
 
     static string LayoutKey(Profile p) => string.Join("|", p.layout.Select(x => x.slot + ":" + x.offset + ":" + x.format.name));
@@ -462,7 +479,7 @@ public static class ColourPass6VS229351PS229352BatchImporter
     {
         foreach (string p in new[] {
             Root + "/Runtime", Root + "/Editor", Root + "/Geometry/Meshes", Root + "/Materials", Root + "/Profiles",
-            "Validation/ColourPass6_VS229351"
+            Root + "/Textures", "Validation/ColourPass6_VS229351"
         }) Directory.CreateDirectory(Absolute(p));
     }
 }

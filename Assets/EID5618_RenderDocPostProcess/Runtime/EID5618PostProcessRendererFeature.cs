@@ -15,6 +15,10 @@ using UnityEditor;
 /// </summary>
 public sealed class EID5618PostProcessRendererFeature : ScriptableRendererFeature
 {
+#if UNITY_EDITOR
+    public static Action<CommandBuffer, Texture, Texture> CaptureInputsForDiagnostics;
+    public static Action<CommandBuffer, RTHandle> CaptureOutputForDiagnostics;
+#endif
     [Serializable]
     public sealed class Settings
     {
@@ -366,10 +370,12 @@ sealed class EID5618PostProcessPass : ScriptableRenderPass
                 }
                 return;
             }
-            // Bind exactly the three RenderDoc PS image roles. Only res9 is live.
-            Texture res10 = ResolveCapturedTexture(profile != null ? profile.res10 : null,
-                "Assets/EID5618_RenderDocPostProcess/CapturedInputs/UnityNative/res10.asset",
-                "Assets/EID5618_RenderDocPostProcess/CapturedInputs/res10.png");
+            Texture liveRes10 = Shader.GetGlobalTexture(Res10);
+            Texture res10 = IsLiveRes10(liveRes10)
+                ? liveRes10
+                : ResolveCapturedTexture(profile != null ? profile.res10 : null,
+                    "Assets/EID5618_RenderDocPostProcess/CapturedInputs/UnityNative/res10.asset",
+                    "Assets/EID5618_RenderDocPostProcess/CapturedInputs/res10.png");
             if (res10 == null && !warnedMissing)
             {
                 Debug.LogError("[EID5618] RenderDoc res10 is not imported/bound. Check res10_rgba16f.dds in EID5618_InputProfile.");
@@ -377,6 +383,9 @@ sealed class EID5618PostProcessPass : ScriptableRenderPass
             }
             if (res10 == null) return;
 
+#if UNITY_EDITOR
+            EID5618PostProcessRendererFeature.CaptureInputsForDiagnostics?.Invoke(cmd, res9Texture, res10);
+#endif
             material.SetTexture(Res9, res9Texture);
             material.SetTexture(Res10, res10);
             material.SetTexture(Res11, lut);
@@ -389,7 +398,7 @@ sealed class EID5618PostProcessPass : ScriptableRenderPass
             if (!loggedBindings)
             {
                 loggedBindings = true;
-                Debug.Log($"[EID5618] Exact pass bindings: source={sourceMode}, res9={DescribeTexture(res9Texture)} materialRes9={DescribeTexture(material.GetTexture(Res9))}, res10={DescribeTexture(res10)} materialRes10={DescribeTexture(material.GetTexture(Res10))}, res11={DescribeTexture(lut)} materialRes11={DescribeTexture(material.GetTexture(Res11))}, debug={settings.debugOutput}, cameraTarget={DescribeTarget(cameraColor)}");
+                Debug.Log($"[EID5618] Exact pass bindings: source={sourceMode}, res9={DescribeTexture(res9Texture)} materialRes9={DescribeTexture(material.GetTexture(Res9))}, res10={DescribeTexture(res10)} ({(IsLiveRes10(res10) ? "CP3 live" : "dump")}) materialRes10={DescribeTexture(material.GetTexture(Res10))}, res11={DescribeTexture(lut)} materialRes11={DescribeTexture(material.GetTexture(Res11))}, debug={settings.debugOutput}, cameraTarget={DescribeTarget(cameraColor)}");
             }
 
             material.SetFloat(LinearDisplay, 1.0f);
@@ -416,12 +425,23 @@ sealed class EID5618PostProcessPass : ScriptableRenderPass
             cmd.BeginSample("EID5618 Display Decode");
             cmd.DrawProcedural(Matrix4x4.identity, material, 1, MeshTopology.Triangles, 3, 1);
             cmd.EndSample("EID5618 Display Decode");
+            #if UNITY_EDITOR
+            EID5618PostProcessRendererFeature.CaptureOutputForDiagnostics?.Invoke(cmd, cameraColor);
+            cmd.SetRenderTarget(cameraColor.nameID);
+            #endif
             context.ExecuteCommandBuffer(cmd);
         }
         finally
         {
             CommandBufferPool.Release(cmd);
         }
+    }
+
+    static bool IsLiveRes10(Texture texture)
+    {
+        if (texture == null) return false;
+        try { return texture.GetInstanceID() != 0 && texture.width == 683 && texture.height == 384; }
+        catch (MissingReferenceException) { return false; }
     }
 
     static string DescribeTexture(Texture texture)

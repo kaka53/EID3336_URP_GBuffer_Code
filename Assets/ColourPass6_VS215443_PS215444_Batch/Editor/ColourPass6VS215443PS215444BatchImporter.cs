@@ -23,6 +23,22 @@ public static class ColourPass6VS215443PS215444BatchImporter
     const string AuditPath = "Validation/ColourPass6_VS215443/VertexAttributeAudit.md";
     const string SceneRootName = "ColourPass6_VS215443_PS215444";
     static readonly int[] ExpectedEIDs = { 1627, 1642, 1647, 1652, 1657, 1682, 1692, 1696 };
+    static readonly Dictionary<int, Vector4> Wave1Uniforms49P04 = new Dictionary<int, Vector4>
+    {
+        { 1627, new Vector4(0.35f, 4f, 0.5f, 1f) },
+        { 1642, new Vector4(0.35f, 4f, 0.5f, 1f) },
+        { 1647, new Vector4(0.35f, 4f, 0.5f, 1f) },
+        { 1652, new Vector4(0.35f, 4f, 0.5f, 1f) },
+        { 1657, new Vector4(0.35f, 4f, 0.5f, 1f) },
+        { 1682, new Vector4(0.35f, 4f, 0.5f, 1f) },
+        { 1692, new Vector4(0.35f, 4f, 0f, 0f) },
+        { 1696, new Vector4(0.35f, 4f, 0f, 0f) },
+    };
+    static readonly Dictionary<int, int> Wave1Uniforms49EID = new Dictionary<int, int>
+    {
+        { 1627, 4710 }, { 1642, 4730 }, { 1647, 4735 }, { 1652, 4745 },
+        { 1657, 4750 }, { 1682, 4775 }, { 1692, 4785 }, { 1696, 4789 },
+    };
     static readonly int ExpectedInstances = 8;
     static readonly int ExpectedLayoutVariants = 4;
     static bool busy;
@@ -250,6 +266,8 @@ public static class ColourPass6VS215443PS215444BatchImporter
         m.shader = shader; m.name = "EID" + p.eid + " VS215443 PS215444";
         byte[] local = ReadCB(p, "PS", "uniforms24");
         for (int i = 0; i < 18; ++i) m.SetVector("_P" + i.ToString("00"), ReadVector4(local, i * 16));
+        if (Wave1Uniforms49P04.TryGetValue(p.eid, out Vector4 p04))
+            m.SetVector("_P04", p04);
         byte[] instanceCB = ReadCB(p, "PS", "uniforms19");
         m.SetVector("_InstancePacked", ReadVector4(instanceCB, 80));
         byte[] globals = ReadCB(p, "PS", "uniforms16");
@@ -261,8 +279,20 @@ public static class ColourPass6VS215443PS215444BatchImporter
             throw new FileNotFoundException("EID" + p.eid + " res25/res26 texture binding is incomplete.");
         m.SetTexture("_Res25", albedo);
         m.SetTexture("_Res26", normalTex);
+        m.SetTexture("FS_56", albedo);
+        m.SetTexture("FS_58", normalTex);
+        ApplyWave1FS49(m, p.eid);
+        // Preserve the measured, target-specific EID1642 correction on reimport.
+        if (p.eid == 1642) {
+            var fixedShader = AssetDatabase.LoadAssetAtPath<Shader>("Assets/EID1642_ColorFix/Shaders/EID1642.shader");
+            var fixedNormal = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/EID1642_ColorFix/Normal_BC5_Capture.asset");
+            if (fixedShader != null && fixedNormal != null) {
+                m.shader = fixedShader;
+                m.SetTexture("_Res26", fixedNormal); m.SetTexture("FS_58", fixedNormal);
+            }
+        }
         EditorUtility.SetDirty(m);
-        report.AppendLine("EID" + p.eid + ": material res25=RID" + Rid(p, "res25") + " res26=RID" + Rid(p, "res26") + " PS uniforms24=" + local.Length + "B");
+        report.AppendLine("EID" + p.eid + ": material res25=RID" + Rid(p, "res25") + " res26=RID" + Rid(p, "res26") + " PS uniforms24=" + local.Length + "B FS_56/FS_58=_Res25/_Res26 FS49=Wave1");
         return m;
     }
 
@@ -347,7 +377,7 @@ public static class ColourPass6VS215443PS215444BatchImporter
         {
             Generated g = generated[p.eid];
             if (g.mesh == null || g.mesh.vertexCount != p.vertexCount) throw new InvalidDataException("EID" + p.eid + " persisted mesh mismatch.");
-            if (g.material == null || g.material.shader == null || g.material.shader.name != "EID/URP/VS215443_PS215444_GBuffer")
+            if (g.material == null || g.material.shader == null || (g.material.shader.name != "EID/URP/VS215443_PS215444_GBuffer" && !(p.eid == 1642 && g.material.shader.name == "EID/URP/EID1642_Verified")))
                 throw new InvalidDataException("EID" + p.eid + " material shader mismatch.");
         }
         report.AppendLine("profiles=" + manifest.profiles.Length);
@@ -568,6 +598,20 @@ public static class ColourPass6VS215443PS215444BatchImporter
         return rank;
     }
     static int Rid(Profile p, string name) { TextureRef t = p.textures.FirstOrDefault(x => x.name == name); return t == null ? 0 : t.rid; }
+
+    static void ApplyWave1FS49(Material m, int eid)
+    {
+        if (!Wave1Uniforms49EID.TryGetValue(eid, out int wave))
+            throw new InvalidDataException("EID" + eid + " has no Wave1 uniforms49 mapping.");
+        string path = Absolute(".rdctools/eid" + wave + "_ps_uniforms49.bin");
+        if (!File.Exists(path))
+            throw new FileNotFoundException("Wave1 uniforms49 missing for EID" + eid, path);
+        byte[] b = File.ReadAllBytes(path);
+        if (b.Length < 336)
+            throw new InvalidDataException("EID" + eid + " Wave1 uniforms49 expected 336 bytes, got " + b.Length);
+        for (int i = 0; i < 21; ++i)
+            m.SetVector("_FS49_" + i.ToString("00"), ReadVector4(b, i * 16));
+    }
 
     static Vector4 ReadVector4(byte[] b, int o) => new Vector4(ReadFloat(b, o), ReadFloat(b, o + 4), ReadFloat(b, o + 8), ReadFloat(b, o + 12));
     static float ReadFloat(byte[] b, int o) => BitConverter.ToSingle(b, o);

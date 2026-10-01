@@ -1,0 +1,15 @@
+#pragma kernel Audit
+#pragma use_dxc
+#include "CP26BVS.hlsl"
+StructuredBuffer<float4> _AuditInput;
+RWStructuredBuffer<float4> _AuditOutput;
+uint _AuditCount;
+[numthreads(64,1,1)]
+void Audit(uint3 id:SV_DispatchThreadID){uint i=id.x;if(i>=_AuditCount)return;
+float4 pos=_AuditInput[i*7],normal=_AuditInput[i*7+1],tangent=_AuditInput[i*7+2],direction=_AuditInput[i*7+3],uvpacked=_AuditInput[i*7+4];
+CP26BBakedPosition=pos.xyz;CP26BBakedNormal=normal.xyz;CP26BBakedTangent=tangent;
+CP26BVS_SPIRV_Cross_Input x=(CP26BVS_SPIRV_Cross_Input)0;x.CP26BVS_3=pos.xyz;x.CP26BVS_4=uvpacked.xy;x.CP26BVS_5=float3(uvpacked.z,0,0);x.CP26BVS_7=direction.xy;x.CP26BVS_8=direction;x.CP26BVS_10=_AuditInput[i*7+5];x.CP26BVS_11=(uint4)_AuditInput[i*7+6];
+CP26BVS_SPIRV_Cross_Output o=CP26BVS_main(x);
+_AuditOutput[i*6]=o.CP26BVS_gl_Position*float4(1,-1,1,1);
+_AuditOutput[i*6+1]=float4(o.CP26BVS_12,0,0);_AuditOutput[i*6+2]=float4(o.CP26BVS_13,0);_AuditOutput[i*6+3]=float4(o.CP26BVS_14,0);_AuditOutput[i*6+4]=float4(o.CP26BVS_16,0);_AuditOutput[i*6+5]=float4(o.CP26BVS_17,0);
+}

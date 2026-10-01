@@ -194,7 +194,11 @@ public static class ColourPass6VS209990PS209991BatchImporter
         mesh.SetIndexBufferParams(indices32.Length, IndexFormat.UInt32);
         mesh.SetIndexBufferData(indices32, 0, 0, indices32.Length, MeshUpdateFlags.DontRecalculateBounds | MeshUpdateFlags.DontValidateIndices);
         mesh.subMeshCount = 1;
-        mesh.SetSubMesh(0, new SubMeshDescriptor(0, indices32.Length, MeshTopology.Triangles), MeshUpdateFlags.DontRecalculateBounds | MeshUpdateFlags.DontValidateIndices);
+        mesh.SetSubMesh(0, new SubMeshDescriptor(0, indices32.Length, MeshTopology.Triangles)
+        {
+            firstVertex = 0,
+            vertexCount = count
+        }, MeshUpdateFlags.DontRecalculateBounds | MeshUpdateFlags.DontValidateIndices);
         mesh.RecalculateBounds();
         AssetDatabase.CreateAsset(mesh, path);
 

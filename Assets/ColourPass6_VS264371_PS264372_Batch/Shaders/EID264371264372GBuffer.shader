@@ -3,8 +3,8 @@ Shader "EID/URP/VS264371_PS264372_GBuffer"
     Properties
     {
         [Header(RenderDoc_Unique_Textures)]
-        _Res23 ("res23 基础颜色 Binding3", 2D) = "white" {}
-        _Res25 ("res25 切线法线 Binding2", 2D) = "bump" {}
+        [NoScaleOffset] _Res23 ("res23 基础颜色 Binding3", 2D) = "white" {}
+        [NoScaleOffset] _Res25 ("res25 切线法线 Binding2", 2D) = "bump" {}
         [Header(RenderDoc_PS_uniforms28_c00_c23)]
         _P00 ("c00 捕获局部参数", Vector) = (0,0,0,0)
         _P01 ("c01 捕获局部参数", Vector) = (0,0,0,0)
@@ -34,19 +34,20 @@ Shader "EID/URP/VS264371_PS264372_GBuffer"
         _InstanceStateYZ ("uniforms20 child1.yz + child5.x", Vector) = (0,0,0,0)
         _EID264372MipBias ("uniforms17 全局纹理 Mip Bias", Float) = 0
         _UseBakedSkinning ("Captured ssbo skin baked into VSInput", Float) = 0
+        _AlphaCutoff ("透贴裁剪阈值", Range(0,1)) = 0.5
     }
     SubShader
     {
-        Tags { "RenderPipeline"="UniversalPipeline" "RenderType"="Opaque" "Queue"="Geometry+10" }
+        Tags { "RenderPipeline"="UniversalPipeline" "RenderType"="TransparentCutout" "Queue"="AlphaTest" }
         Pass
         {
             Name "VS264371_PS264372_UniversalGBuffer"
             Tags { "LightMode"="UniversalGBuffer" "UniversalMaterialType"="Lit" }
             Cull Off
-            ZWrite Off
-            ZTest Equal
+            ZWrite On
+            ZTest LEqual
             Blend Off
-            Stencil { Ref 0 Comp Always Pass Replace ReadMask 255 WriteMask 255 }
+            Stencil { Ref 33 Comp Always Pass Replace ReadMask 255 WriteMask 255 }
             HLSLPROGRAM
             #pragma target 5.0
             #pragma exclude_renderers gles gles3 glcore

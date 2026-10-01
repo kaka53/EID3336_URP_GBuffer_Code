@@ -23,6 +23,11 @@ public static class ColourPass6VS215439PS215440BatchImporter
     const string AuditPath = "Validation/ColourPass6_VS215439/VertexAttributeAudit.md";
     const string SceneRootName = "ColourPass6_VS215439_PS215440";
     static readonly int[] ExpectedEIDs = { 1586, 1592, 1597, 1702, 1706, 1711, 1732 };
+    static readonly Dictionary<int, int> Wave1Uniforms49EID = new Dictionary<int, int>
+    {
+        { 1711, 4817 },
+    };
+    const string CharacterForwardPass = "VS215993_PS215994_EID4730CharacterForward";
     static readonly int ExpectedInstances = 7;
     static readonly int ExpectedLayoutVariants = 3;
     static bool busy;
@@ -264,8 +269,25 @@ public static class ColourPass6VS215439PS215440BatchImporter
         if (albedo == null)
             throw new FileNotFoundException("EID" + p.eid + " res24 texture binding is incomplete.");
         m.SetTexture("_Res24", albedo);
+        if (Wave1Uniforms49EID.ContainsKey(p.eid))
+        {
+            Texture lut = LoadTextureByRid(195216);
+            Texture extra52 = LoadTextureByRid(269336);
+            if (lut == null || extra52 == null)
+                throw new FileNotFoundException("EID" + p.eid + " EID4817 extra texture binding is incomplete.");
+            m.SetTexture("FS4817_49", lut);
+            m.SetTexture("FS4817_51", albedo);
+            m.SetTexture("FS4817_52", extra52);
+            ApplyWave1FS49(m, p.eid);
+            m.SetShaderPassEnabled(CharacterForwardPass, true);
+            report.AppendLine("EID" + p.eid + ": material res24=RID" + Rid(p, "res24") + " stencil=" + CapturedStencil(p) + " PS uniforms23=" + local.Length + "B FS4817_51=_Res24 FS49=EID4817 400B");
+        }
+        else
+        {
+            m.SetShaderPassEnabled(CharacterForwardPass, false);
+            report.AppendLine("EID" + p.eid + ": material res24=RID" + Rid(p, "res24") + " stencil=" + CapturedStencil(p) + " PS uniforms23=" + local.Length + "B CharacterForward=off");
+        }
         EditorUtility.SetDirty(m);
-        report.AppendLine("EID" + p.eid + ": material res24=RID" + Rid(p, "res24") + " stencil=" + CapturedStencil(p) + " PS uniforms23=" + local.Length + "B");
         return m;
     }
 
@@ -536,6 +558,36 @@ public static class ColourPass6VS215439PS215440BatchImporter
         }
         report.AppendLine("localUniqueMaterialRIDs=" + unique + " (existing family assets reused when RID already present)");
     }
+    static void ApplyWave1FS49(Material m, int eid)
+    {
+        if (!Wave1Uniforms49EID.TryGetValue(eid, out int wave))
+            throw new InvalidDataException("EID" + eid + " has no Wave1 uniforms49 mapping.");
+        string path = Absolute(".rdctools/eid" + wave + "/ps_uniforms49.bin");
+        if (!File.Exists(path))
+            throw new FileNotFoundException("EID" + wave + " uniforms49 missing for EID" + eid, path);
+        byte[] b = File.ReadAllBytes(path);
+        if (b.Length < 400)
+            throw new InvalidDataException("EID" + eid + " EID" + wave + " uniforms49 expected 400 bytes, got " + b.Length);
+        for (int i = 0; i < 25; ++i)
+            m.SetVector("_FS49_" + i.ToString("00"), ReadVector4(b, i * 16));
+    }
+
+    static Texture LoadTextureByRid(int rid)
+    {
+        Texture t = AssetDatabase.LoadAssetAtPath<Texture>(Root + "/TextureDatabase/rid" + rid + ".dds");
+        if (t != null) return t;
+        string[] hits = AssetDatabase.FindAssets("rid" + rid);
+        foreach (string guid in hits)
+        {
+            string pth = AssetDatabase.GUIDToAssetPath(guid);
+            if (string.IsNullOrEmpty(pth) || pth.EndsWith(".meta", StringComparison.OrdinalIgnoreCase) || pth.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
+                continue;
+            t = AssetDatabase.LoadAssetAtPath<Texture>(pth);
+            if (t != null) return t;
+        }
+        return null;
+    }
+
     static Texture LoadTexture(Profile p, string name)
     {
         int rid = Rid(p, name);

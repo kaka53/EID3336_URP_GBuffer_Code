@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
@@ -10,6 +11,10 @@ using UnityEditor;
 
 public sealed class EID4649ColourPass20Feature : ScriptableRendererFeature
 {
+#if UNITY_EDITOR
+    // Optional, non-mutating input audit; null in normal rendering.
+    public static Action<CommandBuffer, Camera, Texture, Texture, Texture, Texture> CaptureInputsForDiagnostics;
+#endif
     public const string ShaderName = "Hidden/EID4649/ExactRenderDoc";
     public const string GlobalTextureName = "_EID4649ColourPass20RT";
     public const int CapturedWidth = 1366;
@@ -52,6 +57,9 @@ public sealed class EID4649ColourPass20Feature : ScriptableRendererFeature
         [Header("LightPass _29")]
         [Tooltip("live=_EID4649ColourPass20RT；capture=4662 reflection_validity_b6。不改 FS 算术。")]
         public InputSource liveCapture = InputSource.Live;
+        [Header("CharacterForward rid209554")]
+        [Tooltip("Live=_EID4649ColourPass20RT 替换 CharacterForward rid209554（FS_40 / EID4725PS_40 / EID4705PS_41 等同作用槽）。Captured=dump rid209554。不改 FS 算术。")]
+        public InputSource characterForward40 = InputSource.Live;
     }
 
     public Settings settings = new Settings();
@@ -61,6 +69,53 @@ public sealed class EID4649ColourPass20Feature : ScriptableRendererFeature
     static Texture lightPass29Game;
     static Texture lightPass29Scene;
     static bool lightPass29Override;
+    static Texture characterForward40Game;
+    static Texture characterForward40Scene;
+    static Texture characterForward40Dump;
+    static RTHandle characterForward40GameHandle;
+    static RTHandle characterForward40SceneHandle;
+    static bool characterForward40LiveGame;
+    static bool characterForward40LiveScene;
+    static bool loggedCharacterForward40;
+    static int characterForward40SlotFrame = -1;
+    static int[] characterForward40GlobalAliasIds;
+    static MaterialPropertyBlock characterForward40Block;
+    static readonly List<(Renderer renderer, int materialIndex, int propId)> characterForward40Slots =
+        new List<(Renderer, int, int)>(64);
+    static readonly List<(Material material, int propId)> characterForward40MaterialSlots =
+        new List<(Material, int)>(64);
+    static readonly HashSet<Material> characterForward40Materials = new HashSet<Material>();
+    static readonly Dictionary<string, int> characterForward40PropIds =
+        new Dictionary<string, int>(16);
+    static readonly string[] CharacterForward40GlobalAliases =
+    {
+        "FS_40",
+        "EID4725PS_40",
+        "EID4705PS_41",
+        "EID4785PS_40",
+        "EID4740PS_39",
+        "EID4794PS_42",
+        "EID4817PS_39",
+        "EID4883PS_37",
+        "EID4789PS_40"
+    };
+    static readonly string[] CharacterForward40UniqueSlots = CharacterForward40GlobalAliases;
+    static readonly Dictionary<string, string> CharacterForward40ShaderSlots =
+        new Dictionary<string, string>(12)
+        {
+            { "EID/URP/EID4725_RenderDoc", "EID4725PS_40" },
+            { "Hidden/EID4705/CharacterForward", "EID4705PS_41" },
+            { "Hidden/EID4785/CharacterForward", "EID4785PS_40" },
+            { "Hidden/EID4740/CharacterForward", "EID4740PS_39" },
+            { "Hidden/EID4794/CharacterForward", "EID4794PS_42" },
+            { "Hidden/EID4817/CharacterForward", "EID4817PS_39" },
+            { "Hidden/EID4883/HairOutline", "EID4883PS_37" },
+            { "Hidden/EID4780/CharacterForward", "_41" },
+            { "Hidden/EID4812/CharacterForward", "_42" },
+            { "Hidden/EID4730/OriginalVSFS", "FS_40" },
+            { "EID/URP/EID1642_Verified", "FS_40" },
+            { "Hidden/EID4789/CharacterForward", "EID4789PS_40" }
+        };
 
     public override void Create()
     {
@@ -98,6 +153,7 @@ public sealed class EID4649ColourPass20Feature : ScriptableRendererFeature
         materialGame = null;
         materialScene = null;
         ClearDeferredLightPass29Override();
+        ClearCharacterForward40Override();
     }
 
     public static void ApplyDeferredLightPass29Override(Material material, Camera camera)
@@ -108,6 +164,206 @@ public sealed class EID4649ColourPass20Feature : ScriptableRendererFeature
         Texture tex = gameCam ? lightPass29Game : lightPass29Scene;
         if (tex != null)
             material.SetTexture("_29", tex);
+    }
+
+    // Draw-scoped resources must not pass through a persistent Material/Renderer MPB.
+    public static void BindDrawScopedCharacterAO(CommandBuffer cmd, Camera camera, int propertyId)
+    {
+        if (cmd == null || !TryResolveCharacterForward40(camera, out Texture tex, out RTHandle handle)) return;
+        if (handle != null) cmd.SetGlobalTexture(propertyId, handle);
+        else if (tex != null) cmd.SetGlobalTexture(propertyId, tex);
+    }
+
+    public static void ApplyCharacterForward40Override(CommandBuffer cmd, Camera camera)
+    {
+        if (!TryResolveCharacterForward40(camera, out Texture tex, out RTHandle handle))
+            return;
+        BindCharacterForward40Globals(cmd, tex, handle);
+        if (tex == null)
+            return;
+        EnsureCharacterForward40Slots();
+        if (characterForward40Block == null)
+            characterForward40Block = new MaterialPropertyBlock();
+        characterForward40Materials.Clear();
+        for (int i = 0; i < characterForward40Slots.Count; ++i)
+        {
+            Renderer renderer = characterForward40Slots[i].renderer;
+            if (renderer == null)
+                continue;
+            int materialIndex = characterForward40Slots[i].materialIndex;
+            int propId = characterForward40Slots[i].propId;
+            Material[] materials = renderer.sharedMaterials;
+            Material material = materials != null && materialIndex >= 0 && materialIndex < materials.Length
+                ? materials[materialIndex]
+                : renderer.sharedMaterial;
+            BindCharacterForward40Material(material, propId, tex);
+            renderer.GetPropertyBlock(characterForward40Block, materialIndex);
+            characterForward40Block.SetTexture(propId, tex);
+            renderer.SetPropertyBlock(characterForward40Block, materialIndex);
+        }
+        for (int i = 0; i < characterForward40MaterialSlots.Count; ++i)
+            BindCharacterForward40Material(characterForward40MaterialSlots[i].material, characterForward40MaterialSlots[i].propId, tex);
+        if (!loggedCharacterForward40)
+        {
+            loggedCharacterForward40 = true;
+            bool gameCam = camera != null && camera.cameraType == CameraType.Game;
+            bool live = gameCam ? characterForward40LiveGame : characterForward40LiveScene;
+            Debug.Log("[EID4649] CharacterForward rid209554 source=" + (live ? "Live" : "Captured")
+                + " tex=" + (tex != null ? tex.name + " " + tex.width + "x" + tex.height : "null")
+                + " handle=" + (handle != null ? handle.name : "null")
+                + " slots=" + characterForward40Slots.Count
+                + " materials=" + characterForward40Materials.Count);
+        }
+    }
+
+    static void BindCharacterForward40Material(Material material, int propId, Texture tex)
+    {
+        if (material == null || tex == null || !material.HasProperty(propId) || !characterForward40Materials.Add(material))
+            return;
+        material.SetTexture(propId, tex);
+#if UNITY_EDITOR
+        EditorUtility.ClearDirty(material);
+#endif
+    }
+
+    static void BindCharacterForward40Globals(CommandBuffer cmd, Texture tex, RTHandle handle)
+    {
+        int[] ids = CharacterForward40AliasIds();
+        for (int i = 0; i < ids.Length; ++i)
+        {
+            if (handle != null && cmd != null)
+                cmd.SetGlobalTexture(ids[i], handle);
+            else if (tex != null && cmd != null)
+                cmd.SetGlobalTexture(ids[i], tex);
+            if (tex != null)
+                Shader.SetGlobalTexture(ids[i], tex);
+        }
+    }
+
+    static int[] CharacterForward40AliasIds()
+    {
+        if (characterForward40GlobalAliasIds != null)
+            return characterForward40GlobalAliasIds;
+        characterForward40GlobalAliasIds = new int[CharacterForward40GlobalAliases.Length];
+        for (int i = 0; i < CharacterForward40GlobalAliases.Length; ++i)
+            characterForward40GlobalAliasIds[i] = Shader.PropertyToID(CharacterForward40GlobalAliases[i]);
+        return characterForward40GlobalAliasIds;
+    }
+
+    static bool TryResolveCharacterForward40(Camera camera, out Texture tex, out RTHandle handle)
+    {
+        bool gameCam = camera != null && camera.cameraType == CameraType.Game;
+        bool live = gameCam ? characterForward40LiveGame : characterForward40LiveScene;
+        if (live)
+        {
+            handle = gameCam ? characterForward40GameHandle : characterForward40SceneHandle;
+            tex = gameCam ? characterForward40Game : characterForward40Scene;
+            if (tex == null && handle != null)
+                tex = handle.rt;
+            return tex != null || handle != null;
+        }
+        handle = null;
+        tex = EnsureCharacterForward40Dump();
+        return tex != null;
+    }
+
+    static Texture EnsureCharacterForward40Dump()
+    {
+        if (characterForward40Dump != null)
+            return characterForward40Dump;
+#if UNITY_EDITOR
+        characterForward40Dump = AssetDatabase.LoadAssetAtPath<Texture>(NativeRoot + "rid209554.asset");
+#endif
+        return characterForward40Dump;
+    }
+
+    static void EnsureCharacterForward40Slots()
+    {
+        int frame = Time.frameCount;
+        if (characterForward40SlotFrame == frame)
+            return;
+        characterForward40SlotFrame = frame;
+        characterForward40Slots.Clear();
+        characterForward40MaterialSlots.Clear();
+        Renderer[] renderers = UnityEngine.Object.FindObjectsOfType<Renderer>(true);
+        for (int i = 0; i < renderers.Length; ++i)
+        {
+            Renderer renderer = renderers[i];
+            if (renderer == null)
+                continue;
+            Material[] materials = renderer.sharedMaterials;
+            if (materials == null)
+                continue;
+            for (int m = 0; m < materials.Length; ++m)
+            {
+                if (!TryGetCharacterForward40Slot(materials[m], out int propId))
+                    continue;
+                characterForward40Slots.Add((renderer, m, propId));
+            }
+        }
+
+        Material[] allMaterials = Resources.FindObjectsOfTypeAll<Material>();
+        for (int i = 0; i < allMaterials.Length; ++i)
+        {
+            if (!TryGetCharacterForward40Slot(allMaterials[i], out int propId))
+                continue;
+            characterForward40MaterialSlots.Add((allMaterials[i], propId));
+        }
+    }
+
+    static bool TryGetCharacterForward40Slot(Material material, out int propId)
+    {
+        propId = 0;
+        if (material == null || material.shader == null)
+            return false;
+        if (CharacterForward40ShaderSlots.TryGetValue(material.shader.name, out string slot))
+            return TryGetCharacterForward40Prop(material, slot, out propId);
+        for (int i = 0; i < CharacterForward40UniqueSlots.Length; ++i)
+        {
+            if (TryGetCharacterForward40Prop(material, CharacterForward40UniqueSlots[i], out propId))
+                return true;
+        }
+        return false;
+    }
+
+    static bool TryGetCharacterForward40Prop(Material material, string slot, out int propId)
+    {
+        if (!characterForward40PropIds.TryGetValue(slot, out propId))
+        {
+            propId = Shader.PropertyToID(slot);
+            characterForward40PropIds.Add(slot, propId);
+        }
+        return material.HasProperty(propId);
+    }
+
+    static void ClearCharacterForward40Override()
+    {
+        characterForward40LiveGame = false;
+        characterForward40LiveScene = false;
+        characterForward40Game = null;
+        characterForward40Scene = null;
+        characterForward40GameHandle = null;
+        characterForward40SceneHandle = null;
+        loggedCharacterForward40 = false;
+        characterForward40SlotFrame = -1;
+        characterForward40Slots.Clear();
+        characterForward40MaterialSlots.Clear();
+    }
+
+    static void PublishCharacterForward40Override(bool liveRequested, bool gameCam, Texture tex, RTHandle handle)
+    {
+        if (gameCam)
+        {
+            characterForward40LiveGame = liveRequested;
+            characterForward40Game = liveRequested ? tex : null;
+            characterForward40GameHandle = liveRequested ? handle : null;
+        }
+        else
+        {
+            characterForward40LiveScene = liveRequested;
+            characterForward40Scene = liveRequested ? tex : null;
+            characterForward40SceneHandle = liveRequested ? handle : null;
+        }
     }
 
     static void ClearDeferredLightPass29Override()
@@ -148,6 +404,7 @@ public sealed class EID4649ColourPass20Feature : ScriptableRendererFeature
         if (pass == null || materialGame == null || materialScene == null || !settings.enabledForCamera)
         {
             ClearDeferredLightPass29Override();
+            ClearCharacterForward40Override();
             return;
         }
 
@@ -157,10 +414,15 @@ public sealed class EID4649ColourPass20Feature : ScriptableRendererFeature
 
         if (renderingData.cameraData.isSceneViewCamera)
         {
-            if (!settings.renderInSceneView) return;
+            if (!settings.renderInSceneView)
+            {
+                PublishCharacterForward40Override(false, false, null, null);
+                return;
+            }
         }
         else if (!settings.renderInGameView)
         {
+            PublishCharacterForward40Override(false, true, null, null);
             return;
         }
 
@@ -184,8 +446,6 @@ public sealed class EID4649ColourPass20Feature : ScriptableRendererFeature
         static readonly int Id78 = Shader.PropertyToID("_7_8");
         static readonly int Id1617 = Shader.PropertyToID("_16_17");
         static readonly int Id2021 = Shader.PropertyToID("_20_21");
-        static readonly int LiveBlurId = Shader.PropertyToID("_EndfieldGTAOBlur");
-        static readonly int LiveContactId = Shader.PropertyToID("_EndfieldContact");
         static readonly int CameraDepthTextureId = Shader.PropertyToID("_CameraDepthTexture");
         static readonly int IdUseLiveCamera = Shader.PropertyToID("_EID4649UseLiveCamera");
         static readonly int IdClipToWorld = Shader.PropertyToID("_EID4649ClipToWorld");
@@ -262,6 +522,7 @@ public sealed class EID4649ColourPass20Feature : ScriptableRendererFeature
             ReleaseSnap(ref lightPass29Game);
             ReleaseSnap(ref lightPass29Scene);
             ClearDeferredLightPass29Override();
+            ClearCharacterForward40Override();
         }
 
         public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
@@ -281,20 +542,22 @@ public sealed class EID4649ColourPass20Feature : ScriptableRendererFeature
             RTHandle colorTarget = EnsureColorTarget(gameCam, width, height);
             Material material = gameCam ? materialGame : materialScene;
             if (colorTarget == null || material == null)
+            {
+                PublishCharacterForward40Override(false, gameCam, null, null);
                 return;
+            }
             if (!EnsureConstantBuffers())
+            {
+                PublishCharacterForward40Override(false, gameCam, null, null);
                 return;
+            }
 
             CommandBuffer cmd = CommandBufferPool.Get("EID4649 Colour Pass #20");
             try
             {
                 if (!BindTextures(cmd, ref renderingData, material, gameCam, width, height, out Texture tex15, out Texture tex24, out Texture tex27))
                 {
-                    if (!gameCam)
-                    {
-                        RestoreGameGlobals(cmd);
-                        context.ExecuteCommandBuffer(cmd);
-                    }
+                    PublishCharacterForward40Override(false, gameCam, null, null);
                     return;
                 }
 
@@ -309,8 +572,7 @@ public sealed class EID4649ColourPass20Feature : ScriptableRendererFeature
                 cmd.SetRenderTarget(colorTarget);
                 cmd.SetViewport(new Rect(0f, 0f, width, height));
                 cmd.DrawProcedural(Matrix4x4.identity, material, 0, MeshTopology.Triangles, 3, 1, propertyBlock);
-                if (gameCam)
-                    cmd.SetGlobalTexture(GlobalTextureId, colorTarget);
+                cmd.SetGlobalTexture(GlobalTextureId, colorTarget);
 
                 if (settings.liveCapture == InputSource.Live && colorTarget.rt != null)
                 {
@@ -331,8 +593,12 @@ public sealed class EID4649ColourPass20Feature : ScriptableRendererFeature
                     PublishDeferredLightPass29Override(false, gameCam, null);
                 }
 
-                if (!gameCam)
-                    RestoreGameGlobals(cmd);
+                PublishCharacterForward40Override(
+                    settings.characterForward40 == InputSource.Live,
+                    gameCam,
+                    colorTarget.rt,
+                    colorTarget);
+                ApplyCharacterForward40Override(cmd, renderingData.cameraData.camera);
 
                 context.ExecuteCommandBuffer(cmd);
             }
@@ -359,8 +625,13 @@ public sealed class EID4649ColourPass20Feature : ScriptableRendererFeature
             }
 
             tex15 = ResolveTex15(cmd, ref renderingData, gameCam, width, height);
-            tex24 = ResolveTex24(cmd, gameCam);
-            tex27 = ResolveTex27(cmd, gameCam);
+            EndfieldCP2ExactReplayFeature.TryGetColourPass20Inputs(renderingData.cameraData.camera,
+                out Texture producerBlur, out Texture producerContact);
+            tex24 = ResolveTex24(cmd, gameCam, producerBlur);
+            tex27 = ResolveTex27(cmd, gameCam, producerContact);
+#if UNITY_EDITOR
+            CaptureInputsForDiagnostics?.Invoke(cmd, renderingData.cameraData.camera, producerBlur, producerContact, tex24, tex27);
+#endif
 
             if (tex15 == null || cached22 == null || cached23 == null || tex24 == null || cached25 == null || tex27 == null)
             {
@@ -449,11 +720,10 @@ public sealed class EID4649ColourPass20Feature : ScriptableRendererFeature
             return cached15Fallback;
         }
 
-        Texture ResolveTex24(CommandBuffer cmd, bool gameCam)
+        Texture ResolveTex24(CommandBuffer cmd, bool gameCam, Texture live)
         {
             if (settings.inputSource == InputSource.Captured)
                 return cached24Fallback;
-            Texture live = Shader.GetGlobalTexture(LiveBlurId);
             if (!IsUsable(live))
             {
                 if (!warnedMissing)
@@ -464,11 +734,10 @@ public sealed class EID4649ColourPass20Feature : ScriptableRendererFeature
                 gameCam ? "_EID4649GTAOBlur_Game" : "_EID4649GTAOBlur_Scene", GraphicsFormat.R8_UNorm);
         }
 
-        Texture ResolveTex27(CommandBuffer cmd, bool gameCam)
+        Texture ResolveTex27(CommandBuffer cmd, bool gameCam, Texture live)
         {
             if (settings.inputSource == InputSource.Captured)
                 return cached27Fallback;
-            Texture live = Shader.GetGlobalTexture(LiveContactId);
             if (!IsUsable(live))
             {
                 if (!warnedMissing)
@@ -555,6 +824,9 @@ public sealed class EID4649ColourPass20Feature : ScriptableRendererFeature
                 enableRandomWrite = false
             };
             RTHandle dest = gameCam ? gameRT : sceneRT;
+            // Check before reallocation too: never release or blit over the source RT.
+            if (dest != null && dest.rt == source)
+                return source;
             RenderingUtils.ReAllocateIfNeeded(ref dest, desc, FilterMode.Point, TextureWrapMode.Clamp, name: name);
             if (gameCam)
                 gameRT = dest;
@@ -564,18 +836,6 @@ public sealed class EID4649ColourPass20Feature : ScriptableRendererFeature
                 return null;
             cmd.Blit(source, dest);
             return dest;
-        }
-
-        void RestoreGameGlobals(CommandBuffer cmd)
-        {
-            if (cmd == null)
-                return;
-            if (colorTargetGame != null)
-                cmd.SetGlobalTexture(GlobalTextureId, colorTargetGame);
-            if (liveBlurGame != null)
-                cmd.SetGlobalTexture(LiveBlurId, liveBlurGame);
-            if (liveContactGame != null)
-                cmd.SetGlobalTexture(LiveContactId, liveContactGame);
         }
 
         RTHandle EnsureColorTarget(bool gameCam, int width, int height)

@@ -3,12 +3,14 @@ Shader "EID/URP/VS229351_PS229352_GBuffer"
     Properties
     {
         [Header(RenderDoc_Unique_Textures)]
-        _Res25 ("res25 基础颜色 Binding4", 2D) = "white" {}
-        _Res27 ("res27 extra/normal Binding3", 2D) = "bump" {}
-        _Res31 ("res31 VS wind noise Binding0", 2D) = "gray" {}
+        [NoScaleOffset] _Res25 ("res25 基础颜色 Binding4", 2D) = "white" {}
+        [NoScaleOffset] _Res27 ("res27 extra/normal Binding3", 2D) = "bump" {}
+        [NoScaleOffset] _Res31 ("res31 VS wind noise Binding0", 2D) = "gray" {}
+        [NoScaleOffset] _Res32 ("res32 VS terrain height EID3755 tile", 2D) = "gray" {}
+        [NoScaleOffset] _Res33 ("res33 VS terrain height EID3755 tile", 2D) = "gray" {}
         [Header(RenderDoc_PS_uniforms30_352B)]
         _P00 ("c00 child0-3", Vector) = (0,0,0,0)
-        _P01 ("c01 法线强度 child4 / 双面 child6", Vector) = (1,0,0,0)
+        _P01 ("c01 法线强度 child4 / 双面 child6", Vector) = (1,0,1,0)
         _P02 ("c02 loc3 AO/wrap child8-9 extraMask child10 粗糙度A child11", Vector) = (0.51,0.72,0.35,0)
         _P03 ("c03 粗糙度B child12", Vector) = (1,0,0,0)
         _P04 ("c04 materialY child16 距离衰减 child18 extraPacked child19", Vector) = (0.4,0,0,0.2)
@@ -32,20 +34,26 @@ Shader "EID/URP/VS229351_PS229352_GBuffer"
         _SunDir ("uniforms24 child53 太阳方向", Vector) = (0,-0.57,-0.82,0)
         _WindA ("uniforms24 child25 当前风", Vector) = (1.5,16.58,0,1)
         _WindB ("uniforms24 child37 上一帧风", Vector) = (1.5,16.58,0,1)
+        _TerrainOrigin32 ("EID3755 32m height origin", Vector) = (-518.51,98.94354,-383.6,0)
+        _TerrainOrigin33 ("EID3755 32m height origin prev", Vector) = (-518.51,98.94354,-383.6,0)
+        _TerrainPad ("height accept pad; x covers plant above terrain", Vector) = (16,1.66,1.66,0)
+        _CliffParams ("cliff mix/lateral/cos/drop 215847 c20", Vector) = (1,0.15,7.5,0.05)
+        _CliffRise ("cliff rise 215847 c21.x", Vector) = (5,0,0,0)
         _WindGate ("uniforms24 child36.x 风开关", Float) = 1
         _PrevBlend ("uniforms20 child4", Float) = 0
         _EID229352MipBias ("uniforms19 全局纹理 Mip Bias", Float) = -1
+        _AlphaCutoff ("透贴裁剪阈值 rid256294.a", Range(0,1)) = 0.5
     }
     SubShader
     {
-        Tags { "RenderPipeline"="UniversalPipeline" "RenderType"="Opaque" "Queue"="Geometry+10" }
+        Tags { "RenderPipeline"="UniversalPipeline" "RenderType"="TransparentCutout" "Queue"="AlphaTest" "DisableBatching"="True" }
         Pass
         {
             Name "VS229351_PS229352_UniversalGBuffer"
             Tags { "LightMode"="UniversalGBuffer" "UniversalMaterialType"="Lit" }
             Cull Off
-            ZWrite Off
-            ZTest Equal
+            ZWrite On
+            ZTest LEqual
             Blend Off
             Stencil { Ref 33 Comp Always Pass Replace ReadMask 255 WriteMask 255 }
             HLSLPROGRAM

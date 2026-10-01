@@ -37,7 +37,7 @@ Shader "EID/URP/VS215851_PS215852_GBuffer"
             Tags { "LightMode"="UniversalGBuffer" "UniversalMaterialType"="Lit" }
             Cull Off
             ZWrite On
-            ZTest Equal
+            ZTest LEqual
             Blend Off
             Stencil { Ref [_StencilRef] Comp Always Pass Replace ReadMask 255 WriteMask 255 }
             HLSLPROGRAM

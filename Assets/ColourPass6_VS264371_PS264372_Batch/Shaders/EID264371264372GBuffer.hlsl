@@ -17,6 +17,7 @@ float4 _InstanceMeta;
 float4 _InstanceStateYZ;
 float _EID264372MipBias;
 float _UseBakedSkinning;
+float _AlphaCutoff;
 CBUFFER_END
 
 struct Attributes264371
@@ -121,6 +122,7 @@ GBufferOutput264372 EID264372Fragment(Varyings264371 input, bool isFrontFace : S
     float2 uvAlbedo = lerp(input.uv0, input.uv1, _P02.w) * _P11.xy + _P11.zw;
     float2 uvNormal = lerp(input.uv0, input.uv1, _P03.x) * _P12.xy + _P12.zw;
     float4 albedoSample = SAMPLE_TEXTURE2D_BIAS(_Res23, sampler_Res23, uvAlbedo, mip);
+    clip(albedoSample.a - 0.5);
     float4 normalSample = SAMPLE_TEXTURE2D_BIAS(_Res25, sampler_Res25, uvNormal, _P03.y + mip);
 
     float2 nxy = FilterNormalXY264371(normalSample.xy);

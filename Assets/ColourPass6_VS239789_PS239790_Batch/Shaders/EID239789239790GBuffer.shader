@@ -38,7 +38,10 @@ Shader "EID/URP/VS239789_PS239790_GBuffer"
             Tags { "LightMode"="UniversalGBuffer" "UniversalMaterialType"="Lit" }
             Cull Off
             ZWrite On
-            ZTest GEqual
+            // ShaderLab uses Unity's logical depth convention (as in EID1717).
+            // Unity maps LEqual to the backend comparison for reversed Z;
+            // do not copy RenderDoc's hardware GreaterEqual into ShaderLab.
+            ZTest LEqual
             Blend Off
             Stencil { Ref 52 Comp GEqual Pass Replace ReadMask 16 WriteMask 239 }
             HLSLPROGRAM
@@ -47,6 +50,24 @@ Shader "EID/URP/VS239789_PS239790_GBuffer"
             #pragma vertex EID239789Vertex
             #pragma fragment EID239790Fragment
             #include "EID239789239790GBuffer.hlsl"
+            ENDHLSL
+        }
+        Pass
+        {
+            Name "VS216007_PS216008_EID4673CharacterForward"
+            Tags { "LightMode"="EID4673CharacterForwardOff" }
+            Cull Back
+            ZWrite On
+            ZTest Equal
+            Blend Off
+            ColorMask RGB
+            HLSLPROGRAM
+            #pragma target 5.0
+            #pragma exclude_renderers gles gles3 glcore
+            #pragma vertex EID239789Vertex
+            #pragma fragment EID4673ForwardFragment
+            #include "EID239789239790GBuffer.hlsl"
+            // isolate EID4730: this family LightMode off
             ENDHLSL
         }
     }

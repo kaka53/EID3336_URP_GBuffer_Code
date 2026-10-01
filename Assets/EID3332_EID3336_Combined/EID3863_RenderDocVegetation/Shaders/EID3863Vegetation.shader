@@ -28,11 +28,15 @@ Shader "EID3863/URP/RenderDocVegetation"
  SubShader
  {
   Tags { "RenderPipeline"="UniversalPipeline" "RenderType"="TransparentCutout" "Queue"="AlphaTest" }
+  Cull Off
   Pass
   {
    Name "EID3863_GBuffer_Compile5"
    Tags { "LightMode"="UniversalGBuffer" "UniversalMaterialType"="Lit" }
-   Cull Off ZWrite On ZTest LEqual Blend Off
+   Cull Off
+   ZWrite On
+   ZTest LEqual
+   Blend Off
    Stencil { Ref 33 Comp Always Pass Replace ReadMask 255 WriteMask 255 }
    HLSLPROGRAM
    #pragma target 5.0

@@ -488,7 +488,7 @@ public static class ColourPass6VS215851PS215852BatchImporter
         report.AppendLine("drawPath=ONE_MESHRENDERER_PER_EID_EXPANDED_CARD");
         report.AppendLine("resourcePolicy=RID_DEDUPLICATED_UNIQUE_MATERIAL_REUSE_VS_WIND");
         report.AppendLine("validation=PASS");
-        audit.Insert(0, "# VS215851 / PS215852 Vertex Attribute Audit\n\n- Date: `" + DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "`\n- EIDs: `32.1-32.3` (`3885,3889,3895`)\n- Layout variants: `2` (`65bcce980b192dbf` 3885/3889, `ec8a53eaa4a26539` EID3895 SNORM input6)\n- Unique source meshes: `3`\n- Instances: `302` via uniforms28 stride 96, one MeshRenderer per EID\n- Packed `_input1` on `NORMAL.x`; live Unity VP; VS wind/terrain RID reuse; unique PS clip; stencil 33 except EID3895 stencil 1; ZTest Equal\n\n");
+        audit.Insert(0, "# VS215851 / PS215852 Vertex Attribute Audit\n\n- Date: `" + DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "`\n- EIDs: `32.1-32.3` (`3885,3889,3895`)\n- Layout variants: `2` (`65bcce980b192dbf` 3885/3889, `ec8a53eaa4a26539` EID3895 SNORM input6)\n- Unique source meshes: `3`\n- Instances: `302` via uniforms28 stride 96, one MeshRenderer per EID\n- Packed `_input1` on `NORMAL.x`; live Unity VP; VS wind/terrain RID reuse; unique PS clip; stencil 33 except EID3895 stencil 1; ZTest LEqual (UniversalGBuffer, same as EID3863/215849; capture Equal has no matching depth)\n\n");
     }
 
     static string LayoutKey(Profile p) => string.Join("|", p.layout.Select(x => x.slot + ":" + x.offset + ":" + x.format.name));

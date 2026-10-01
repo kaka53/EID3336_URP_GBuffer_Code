@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
@@ -102,8 +103,24 @@ public sealed class EndfieldCP2ExactReplayFeature : ScriptableRendererFeature
     static Texture lightPassContactScene;
     static bool lightPassOverride;
 
+    // Explicit producer handles, valid only within the current camera render.
+    // Shader.GetGlobalTexture cannot resolve a binding merely recorded in an SRP command buffer.
+    struct ColourPass20Inputs { public RenderTexture blur, contact; }
+    static readonly Dictionary<int, ColourPass20Inputs> colourPass20Inputs = new Dictionary<int, ColourPass20Inputs>();
+
+    public static bool TryGetColourPass20Inputs(Camera camera, out Texture blur, out Texture contact)
+    {
+        blur = contact = null;
+        if (camera == null || !colourPass20Inputs.TryGetValue(camera.GetInstanceID(), out var inputs)) return false;
+        if (inputs.blur != null && inputs.blur.IsCreated()) blur = inputs.blur;
+        if (inputs.contact != null && inputs.contact.IsCreated()) contact = inputs.contact;
+        return blur != null || contact != null;
+    }
+
     public override void Create()
     {
+        pass?.Dispose();
+        colourPass20Inputs.Clear();
         pass = new Pass(settings);
         pass.renderPassEvent = settings.injectionPoint;
     }
@@ -112,11 +129,14 @@ public sealed class EndfieldCP2ExactReplayFeature : ScriptableRendererFeature
     {
         pass?.Dispose();
         pass = null;
+        colourPass20Inputs.Clear();
         ClearDeferredLightPassOverride();
     }
 
     public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
     {
+        // Includes skipped cameras: never expose a previous render's shared compute intermediates.
+        colourPass20Inputs.Clear();
         if (pass == null || !settings.enabledForCamera)
         {
             ClearDeferredLightPassOverride();
@@ -350,8 +370,17 @@ public sealed class EndfieldCP2ExactReplayFeature : ScriptableRendererFeature
             ConfigureClear(ClearFlag.None, Color.clear);
         }
 
+        RenderTexture producedBlur, producedContact;
+
+        public override void OnCameraCleanup(CommandBuffer cmd)
+        {
+            colourPass20Inputs.Clear();
+        }
+
         public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
         {
+            producedBlur = producedContact = null;
+            colourPass20Inputs.Clear();
             Texture ao = Resolve(settings.inputs != null ? settings.inputs.aoFull : null, "ssao_b18");
             Texture ssr = Resolve(settings.inputs != null ? settings.inputs.ssrColor : null, "screen_specular_color_b7");
             Texture mask = Resolve(settings.inputs != null ? settings.inputs.ssrMask : null, "screen_specular_weight_b8");
@@ -421,6 +450,9 @@ public sealed class EndfieldCP2ExactReplayFeature : ScriptableRendererFeature
             }
 
             context.ExecuteCommandBuffer(cmd);
+            Camera camera = renderingData.cameraData.camera;
+            if (camera != null)
+                colourPass20Inputs[camera.GetInstanceID()] = new ColourPass20Inputs { blur = producedBlur, contact = producedContact };
             CommandBufferPool.Release(cmd);
         }
 
@@ -786,6 +818,7 @@ public sealed class EndfieldCP2ExactReplayFeature : ScriptableRendererFeature
                 cmd.SetComputeTextureParam(cs, blurKernel, BlurId, dst);
                 cmd.DispatchCompute(cs, blurKernel, BlurGroupsX, BlurGroupsY, 1);
                 cmd.SetGlobalTexture(GlobalBlur, dst);
+                producedBlur = dst;
             }
         }
 
@@ -888,6 +921,7 @@ public sealed class EndfieldCP2ExactReplayFeature : ScriptableRendererFeature
                 cmd.SetComputeTextureParam(cs, contactKernel, ContactId, dst);
                 cmd.DispatchCompute(cs, contactKernel, ContactGroupsX, ContactGroupsY, ContactGroupsZ);
                 cmd.SetGlobalTexture(GlobalContact, dst);
+                producedContact = dst;
             }
         }
 

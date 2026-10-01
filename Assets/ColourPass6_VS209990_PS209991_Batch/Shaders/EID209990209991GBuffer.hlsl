@@ -15,6 +15,7 @@ float4 _P16; float4 _P17; float4 _P18; float4 _P19;
 float4 _P20; float4 _P21; float4 _P22;
 float4 _SunDir;
 float _EID209991MipBias;
+float _AlphaCutoff;
 CBUFFER_END
 
 struct Attributes209990
@@ -112,10 +113,11 @@ GBufferOutput209991 EID209991Fragment(Varyings209990 input, bool isFrontFace : S
     float faceSign = isFrontFace ? 1.0 : -1.0;
     float twoSided = lerp(1.0, faceSign, step(0.5, _P03.x + loc3x + loc3y));
 
-    float4 albedoSample = SAMPLE_TEXTURE2D_BIAS(_Res28, sampler_Res28, input.uv0, _EID209991MipBias);
+    float4 albedoSample = SAMPLE_TEXTURE2D_BIAS(_Res26, sampler_Res26, input.uv0, _EID209991MipBias);
+    clip(albedoSample.a - 0.5);
     float3 albedo = loc3x != 0.0 ? albedoSample.rgb : saturate(albedoSample.rgb * _P09.rgb * _P06.x);
 
-    float4 nmSample = SAMPLE_TEXTURE2D_BIAS(_Res26, sampler_Res26, input.uv0, _EID209991MipBias);
+    float4 nmSample = SAMPLE_TEXTURE2D_BIAS(_Res28, sampler_Res28, input.uv0, _EID209991MipBias);
     float4 packed = float4(nmSample.xy, 0.0, 0.0) * float4(2.0, 2.0, 0.0, 0.0) + float4(-1.0, -1.0, 1.0, -1.0);
     packed.z = dot(packed.xyz, -packed.xyw);
     packed.xy *= sqrt(packed.z);

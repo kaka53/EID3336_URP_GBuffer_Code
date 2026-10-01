@@ -23,6 +23,14 @@ public static class ColourPass6VS215452PS215453BatchImporter
     const string AuditPath = "Validation/ColourPass6_VS215452/VertexAttributeAudit.md";
     const string SceneRootName = "ColourPass6_VS215452_PS215453";
     static readonly int[] ExpectedEIDs = { 1717, 1721 };
+    static readonly Dictionary<int, int> Wave1Uniforms49EID = new Dictionary<int, int>
+    {
+        { 1717, 4794 }, { 1721, 4798 },
+    };
+    static readonly Dictionary<int, int> Wave1FS57Rid = new Dictionary<int, int>
+    {
+        { 1717, 224573 }, { 1721, 223755 },
+    };
     static readonly int ExpectedInstances = 2;
     static readonly int ExpectedLayoutVariants = 1;
     static bool busy;
@@ -244,6 +252,12 @@ public static class ColourPass6VS215452PS215453BatchImporter
 
     static Material CreateMaterial(Profile p, Shader shader, StringBuilder report)
     {
+        // EID1721's cutout holes must not overdraw the EID1672 skin in forward.
+        if (p.eid == 1721)
+        {
+            shader = AssetDatabase.LoadAssetAtPath<Shader>("Assets/EID1672_ColorFix/Shaders/EID1721Cutout.shader");
+            if (shader == null) throw new FileNotFoundException("EID1721 cutout depth repair missing");
+        }
         string path = Root + "/Materials/EID" + p.eid + "_VS215452_PS215453.mat";
         Material m = AssetDatabase.LoadAssetAtPath<Material>(path);
         if (m == null) { m = new Material(shader); AssetDatabase.CreateAsset(m, path); }
@@ -253,18 +267,23 @@ public static class ColourPass6VS215452PS215453BatchImporter
         byte[] instanceCB = ReadCB(p, "PS", "uniforms19");
         m.SetVector("_InstancePacked", ReadVector4(instanceCB, 80));
         byte[] globals = ReadCB(p, "PS", "uniforms16");
-        m.SetFloat("_EID215453MipBias", ReadFloat(globals, 416));
+        m.SetFloat("_EID215444MipBias", ReadFloat(globals, 416));
         m.SetFloat("_UseBakedSkinning", HasCapturedSkinning(p) ? 1f : 0f);
         Texture albedo = LoadTexture(p, "res25");
         Texture normalTex = LoadTexture(p, "res26");
         Texture clipTex = LoadTexture(p, "res27");
-        if (albedo == null || normalTex == null || clipTex == null)
-            throw new FileNotFoundException("EID" + p.eid + " res25/res26/res27 texture binding is incomplete.");
+        Texture packed = LoadTextureByRid(Wave1FS57Rid[p.eid]);
+        if (albedo == null || normalTex == null || clipTex == null || packed == null)
+            throw new FileNotFoundException("EID" + p.eid + " res25/res26/res27/FS_57 texture binding is incomplete.");
         m.SetTexture("_Res25", albedo);
         m.SetTexture("_Res26", normalTex);
         m.SetTexture("_Res27", clipTex);
+        m.SetTexture("FS_56", albedo);
+        m.SetTexture("FS_58", normalTex);
+        m.SetTexture("FS_57", packed);
+        ApplyWave1FS49(m, p.eid);
         EditorUtility.SetDirty(m);
-        report.AppendLine("EID" + p.eid + ": material res25=RID" + Rid(p, "res25") + " res26=RID" + Rid(p, "res26") + " res27=RID" + Rid(p, "res27") + " PS uniforms24=" + local.Length + "B");
+        report.AppendLine("EID" + p.eid + ": material res25=RID" + Rid(p, "res25") + " res26=RID" + Rid(p, "res26") + " res27=RID" + Rid(p, "res27") + " FS_57=RID" + Wave1FS57Rid[p.eid] + " PS uniforms24=" + local.Length + "B FS_56/FS_58=_Res25/_Res26 FS49=Wave1");
         return m;
     }
 
@@ -349,7 +368,7 @@ public static class ColourPass6VS215452PS215453BatchImporter
         {
             Generated g = generated[p.eid];
             if (g.mesh == null || g.mesh.vertexCount != p.vertexCount) throw new InvalidDataException("EID" + p.eid + " persisted mesh mismatch.");
-            if (g.material == null || g.material.shader == null || g.material.shader.name != "EID/URP/VS215452_PS215453_GBuffer")
+            if (g.material == null || g.material.shader == null || g.material.shader.name != (p.eid == 1721 ? "EID/URP/EID1721_CutoutDepthEqual" : "EID/URP/VS215452_PS215453_GBuffer"))
                 throw new InvalidDataException("EID" + p.eid + " material shader mismatch.");
         }
         report.AppendLine("profiles=" + manifest.profiles.Length);
@@ -527,6 +546,25 @@ public static class ColourPass6VS215452PS215453BatchImporter
         }
         report.AppendLine("localUniqueMaterialRIDs=" + unique + " (existing family assets reused when RID already present)");
     }
+    static void ApplyWave1FS49(Material m, int eid)
+    {
+        if (!Wave1Uniforms49EID.TryGetValue(eid, out int wave))
+            throw new InvalidDataException("EID" + eid + " has no Wave1 uniforms49 mapping.");
+        string path = Absolute(".rdctools/eid" + wave + "_ps_uniforms49.bin");
+        if (!File.Exists(path))
+            throw new FileNotFoundException("Wave1 uniforms49 missing for EID" + eid, path);
+        byte[] b = File.ReadAllBytes(path);
+        if (b.Length < 336)
+            throw new InvalidDataException("EID" + eid + " Wave1 uniforms49 expected 336 bytes, got " + b.Length);
+        for (int i = 0; i < 21; ++i)
+            m.SetVector("_FS49_" + i.ToString("00"), ReadVector4(b, i * 16));
+    }
+
+    static Texture LoadTextureByRid(int rid)
+    {
+        return AssetDatabase.LoadAssetAtPath<Texture>(Root + "/TextureDatabase/rid" + rid + ".dds");
+    }
+
     static Texture LoadTexture(Profile p, string name)
     {
         int rid = Rid(p, name);

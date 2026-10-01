@@ -17,6 +17,8 @@ float _EID239790MipBias;
 float _UseBakedSkinning;
 CBUFFER_END
 
+#include "../../EID4673_CharacterForward/Shaders/EID215980Lighting.hlsl"
+
 struct Attributes239789
 {
     float3 position : POSITION;
@@ -37,6 +39,7 @@ struct Varyings239789
     float4 tangentWS : TEXCOORD2;
     float3 currentClipXYW : TEXCOORD3;
     float3 previousClipXYW : TEXCOORD4;
+    float3 positionWS : TEXCOORD5;
 };
 
 float3 DecodeOctNormal239789(uint packed)
@@ -87,6 +90,7 @@ Varyings239789 EID239789Vertex(Attributes239789 input)
     o.tangentWS = float4(tangentWS, tangentOS.w * GetOddNegativeScale());
     o.currentClipXYW = clipPos.xyw;
     o.previousClipXYW = clipPos.xyw;
+    o.positionWS = positionWS;
     return o;
 }
 
@@ -139,6 +143,13 @@ GBufferOutput239790 EID239790Fragment(Varyings239789 input, bool isFrontFace : S
     o.rt3 = float4(oct, 0.0, 1.0);
     o.rt4 = float4(albedo, 1.0);
     return o;
+}
+
+float4 EID4673ForwardFragment(Varyings239789 input, bool isFrontFace : SV_IsFrontFace) : SV_Target0
+{
+    float4 albedoSample = SAMPLE_TEXTURE2D_BIAS(_Res25, sampler_Res25, input.uv, _EID239790MipBias);
+    float3 albedo = albedoSample.rgb * _P06.rgb;
+    return float4(EID215980LitColor(albedo, input.positionWS, input.normalWS, isFrontFace, input.positionCS), 1.0);
 }
 
 #endif

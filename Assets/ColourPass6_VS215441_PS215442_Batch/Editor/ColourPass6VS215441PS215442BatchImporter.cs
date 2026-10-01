@@ -23,6 +23,14 @@ public static class ColourPass6VS215441PS215442BatchImporter
     const string AuditPath = "Validation/ColourPass6_VS215441/VertexAttributeAudit.md";
     const string SceneRootName = "ColourPass6_VS215441_PS215442";
     static readonly int[] ExpectedEIDs = { 1618, 1622, 1672 };
+    static readonly Dictionary<int, int> Wave1Uniforms49EID = new Dictionary<int, int>
+    {
+        { 1618, 4765 }, { 1622, 4765 }, { 1672, 4765 },
+    };
+    static readonly Dictionary<int, int> Wave1FS57Rid = new Dictionary<int, int>
+    {
+        { 1618, 269067 }, { 1622, 223378 }, { 1672, 223378 },
+    };
     static readonly int ExpectedInstances = 3;
     static readonly int ExpectedLayoutVariants = 1;
     static bool busy;
@@ -244,25 +252,68 @@ public static class ColourPass6VS215441PS215442BatchImporter
 
     static Material CreateMaterial(Profile p, Shader shader, StringBuilder report)
     {
+        // EID1622: verified view-dependent wrap and native BC5 normals.
+        // EID1672 uses verified view-wrap, integer instance flags and native capture textures.
+        if (p.eid == 1622)
+        {
+            shader = AssetDatabase.LoadAssetAtPath<Shader>("Assets/EID1622_ColorFix/Shaders/EID1622GBuffer.shader");
+            if (shader == null) throw new FileNotFoundException("EID1622 verified GBuffer shader missing");
+        }
+        if (p.eid == 1672)
+        {
+            shader = AssetDatabase.LoadAssetAtPath<Shader>("Assets/EID1672_ColorFix/Shaders/EID1672.shader");
+            if (shader == null) throw new FileNotFoundException("EID1672 verified shader missing");
+        }
         string path = Root + "/Materials/EID" + p.eid + "_VS215441_PS215442.mat";
         Material m = AssetDatabase.LoadAssetAtPath<Material>(path);
         if (m == null) { m = new Material(shader); AssetDatabase.CreateAsset(m, path); }
         m.shader = shader; m.name = "EID" + p.eid + " VS215441 PS215442";
         byte[] local = ReadCB(p, "PS", "uniforms27");
-        for (int i = 0; i < 20; ++i) m.SetVector("_P" + i.ToString("00"), ReadVector4(local, i * 16));
+        for (int i = 0; i < 18; ++i) m.SetVector("_P" + i.ToString("00"), ReadVector4(local, i * 16));
         byte[] instanceCB = ReadCB(p, "PS", "uniforms22");
         m.SetVector("_InstancePacked", ReadVector4(instanceCB, 80));
         byte[] globals = ReadCB(p, "PS", "uniforms19");
-        m.SetFloat("_EID215442MipBias", ReadFloat(globals, 416));
+        m.SetFloat("_EID215444MipBias", ReadFloat(globals, 416));
         m.SetFloat("_UseBakedSkinning", HasCapturedSkinning(p) ? 1f : 0f);
         Texture albedo = LoadTexture(p, "res28");
         Texture normalTex = LoadTexture(p, "res29");
-        if (albedo == null || normalTex == null)
-            throw new FileNotFoundException("EID" + p.eid + " res28/res29 texture binding is incomplete.");
+        if (p.eid == 1622)
+            normalTex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/EID1622_ColorFix/Normal_BC5_Capture.asset");
+        Texture packed = LoadTextureByRid(Wave1FS57Rid[p.eid]);
+        if (p.eid == 1672)
+            packed = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/EID1672_ColorFix/ColorLUT_sRGB.asset");
+        if (albedo == null || normalTex == null || packed == null)
+            throw new FileNotFoundException("EID" + p.eid + " res28/res29/FS4765_53 texture binding is incomplete.");
         m.SetTexture("_Res28", albedo);
         m.SetTexture("_Res29", normalTex);
+        m.SetTexture("FS_58", albedo);
+        m.SetTexture("FS_59", normalTex);
+        m.SetTexture("FS4765_53", packed);
+        Texture lut = LoadTextureByRid(191314);
+        Texture extra51 = LoadTextureByRid(269338);
+        Texture extra52 = LoadTextureByRid(240388);
+        Texture extra54 = LoadTextureByRid(269683);
+        Texture extra55 = LoadTextureByRid(269685);
+        Texture extra60 = LoadTextureByRid(191357);
+        Texture extra61 = LoadTextureByRid(262417);
+        if (lut == null || extra51 == null || extra52 == null || extra54 == null || extra55 == null || extra60 == null || extra61 == null)
+            throw new FileNotFoundException("EID" + p.eid + " EID4765 extra texture binding is incomplete.");
+        if (p.eid == 1672)
+        {
+            lut = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/EID1672_ColorFix/LightingRamp_RGBA8.asset");
+            extra60 = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/EID1672_ColorFix/FaceShadow_RGBA8.asset");
+            if (lut == null || extra60 == null) throw new FileNotFoundException("EID1672 native ramp/face-shadow textures missing");
+        }
+        m.SetTexture("FS4765_50", lut);
+        m.SetTexture("FS4765_51", extra51);
+        m.SetTexture("FS4765_52", extra52);
+        m.SetTexture("FS4765_54", extra54);
+        m.SetTexture("FS4765_55", extra55);
+        m.SetTexture("FS4765_60", extra60);
+        m.SetTexture("FS4765_61", extra61);
+        ApplyWave1FS49(m, p.eid);
         EditorUtility.SetDirty(m);
-        report.AppendLine("EID" + p.eid + ": material res28=RID" + Rid(p, "res28") + " res29=RID" + Rid(p, "res29") + " PS uniforms27=" + local.Length + "B");
+        report.AppendLine("EID" + p.eid + ": material res28=RID" + Rid(p, "res28") + " res29=RID" + Rid(p, "res29") + " FS4765_53=RID" + Wave1FS57Rid[p.eid] + " PS uniforms27=" + local.Length + "B FS_58/FS_59=_Res28/_Res29 FS49=EID4765 384B");
         return m;
     }
 
@@ -347,7 +398,7 @@ public static class ColourPass6VS215441PS215442BatchImporter
         {
             Generated g = generated[p.eid];
             if (g.mesh == null || g.mesh.vertexCount != p.vertexCount) throw new InvalidDataException("EID" + p.eid + " persisted mesh mismatch.");
-            if (g.material == null || g.material.shader == null || g.material.shader.name != "EID/URP/VS215441_PS215442_GBuffer")
+            if (g.material == null || g.material.shader == null || g.material.shader.name != (p.eid == 1622 ? "EID/URP/EID1622_VerifiedGBuffer" : p.eid == 1672 ? "EID/URP/EID1672_Verified" : "EID/URP/VS215441_PS215442_GBuffer"))
                 throw new InvalidDataException("EID" + p.eid + " material shader mismatch.");
         }
         report.AppendLine("profiles=" + manifest.profiles.Length);
@@ -525,6 +576,25 @@ public static class ColourPass6VS215441PS215442BatchImporter
         }
         report.AppendLine("localUniqueMaterialRIDs=" + unique + " (existing family assets reused when RID already present)");
     }
+    static void ApplyWave1FS49(Material m, int eid)
+    {
+        if (!Wave1Uniforms49EID.TryGetValue(eid, out int wave))
+            throw new InvalidDataException("EID" + eid + " has no Wave1 uniforms49 mapping.");
+        string path = Absolute(".rdctools/eid4765/ps_uniforms49.bin");
+        if (!File.Exists(path))
+            throw new FileNotFoundException("EID4765 uniforms49 missing for EID" + eid + " wave" + wave, path);
+        byte[] b = File.ReadAllBytes(path);
+        if (b.Length < 384)
+            throw new InvalidDataException("EID" + eid + " EID4765 uniforms49 expected 384 bytes, got " + b.Length);
+        for (int i = 0; i < 24; ++i)
+            m.SetVector("_FS49_" + i.ToString("00"), ReadVector4(b, i * 16));
+    }
+
+    static Texture LoadTextureByRid(int rid)
+    {
+        return AssetDatabase.LoadAssetAtPath<Texture>(Root + "/TextureDatabase/rid" + rid + ".dds");
+    }
+
     static Texture LoadTexture(Profile p, string name)
     {
         int rid = Rid(p, name);

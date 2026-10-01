@@ -12,11 +12,19 @@ float4 _P00; float4 _P01; float4 _P02; float4 _P03;
 float4 _P04; float4 _P05; float4 _P06; float4 _P07;
 float4 _P08; float4 _P09; float4 _P10; float4 _P11;
 float4 _P12; float4 _P13; float4 _P14; float4 _P15;
-float4 _P16; float4 _P17; float4 _P18;
+float4 _P16; float4 _P17;
 float4 _InstancePacked;
-float _EID215453MipBias;
+float _EID215444MipBias;
 float _UseBakedSkinning;
+float4 _FS49_00; float4 _FS49_01; float4 _FS49_02; float4 _FS49_03;
+float4 _FS49_04; float4 _FS49_05; float4 _FS49_06; float4 _FS49_07;
+float4 _FS49_08; float4 _FS49_09; float4 _FS49_10; float4 _FS49_11;
+float4 _FS49_12; float4 _FS49_13; float4 _FS49_14; float4 _FS49_15;
+float4 _FS49_16; float4 _FS49_17; float4 _FS49_18; float4 _FS49_19;
+float4 _FS49_20;
 CBUFFER_END
+
+#include "../../EID4673_CharacterForward/Shaders/EID215980Lighting.hlsl"
 
 struct Attributes215452
 {
@@ -38,6 +46,7 @@ struct Varyings215452
     float4 tangentWS : TEXCOORD2;
     float3 currentClipXYW : TEXCOORD3;
     float3 previousClipXYW : TEXCOORD4;
+    float3 positionWS : TEXCOORD5;
 };
 
 float3 DecodeOctNormal215452(uint packed)
@@ -88,6 +97,7 @@ Varyings215452 EID215452Vertex(Attributes215452 input)
     o.tangentWS = float4(tangentWS, tangentOS.w * GetOddNegativeScale());
     o.currentClipXYW = clipPos.xyw;
     o.previousClipXYW = clipPos.xyw;
+    o.positionWS = positionWS;
     return o;
 }
 
@@ -103,13 +113,13 @@ struct GBufferOutput215453
 GBufferOutput215453 EID215453Fragment(Varyings215452 input, bool isFrontFace : SV_IsFrontFace)
 {
     GBufferOutput215453 o;
-    float4 albedoSample = SAMPLE_TEXTURE2D_BIAS(_Res25, sampler_Res25, input.uv, _EID215453MipBias);
+    float4 albedoSample = SAMPLE_TEXTURE2D_BIAS(_Res25, sampler_Res25, input.uv, _EID215444MipBias);
     float3 albedo = albedoSample.rgb * _P06.rgb;
 
-    float clipSample = SAMPLE_TEXTURE2D_BIAS(_Res27, sampler_Res27, input.uv, _EID215453MipBias).x;
+    float clipSample = SAMPLE_TEXTURE2D_BIAS(_Res27, sampler_Res27, input.uv, _EID215444MipBias).x;
     clip(clipSample - _P12.x);
 
-    float2 nxy = SAMPLE_TEXTURE2D_BIAS(_Res26, sampler_Res26, input.uv, _EID215453MipBias).xy * 2.0 - 1.0;
+    float2 nxy = SAMPLE_TEXTURE2D_BIAS(_Res26, sampler_Res26, input.uv, _EID215444MipBias).xy * 2.0 - 1.0;
     nxy *= _P00.w;
     float nz = max(0.0, sqrt(saturate(1.0 - dot(nxy, nxy))));
 
@@ -143,6 +153,14 @@ GBufferOutput215453 EID215453Fragment(Varyings215452 input, bool isFrontFace : S
     o.rt3 = float4(oct, 0.0, 1.0);
     o.rt4 = float4(albedo, 1.0);
     return o;
+}
+
+float4 EID4673ForwardFragment(Varyings215452 input, bool isFrontFace : SV_IsFrontFace) : SV_Target0
+{
+    float4 albedoSample = SAMPLE_TEXTURE2D_BIAS(_Res25, sampler_Res25, input.uv, _EID215444MipBias);
+    clip(SAMPLE_TEXTURE2D_BIAS(_Res27, sampler_Res27, input.uv, _EID215444MipBias).x - _P12.x);
+    float3 albedo = albedoSample.rgb * _P06.rgb;
+    return float4(EID215980LitColor(albedo, input.positionWS, input.normalWS, isFrontFace, input.positionCS), 1.0);
 }
 
 #endif
