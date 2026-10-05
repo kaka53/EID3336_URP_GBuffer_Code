@@ -16,6 +16,7 @@ float4 _P20; float4 _P21; float4 _P22;
 float4 _SunDir;
 float _EID209991MipBias;
 float _AlphaCutoff;
+float4 _EID209965AlphaParams;
 CBUFFER_END
 
 struct Attributes209990
@@ -103,9 +104,10 @@ GBufferOutput209991 EID209991Fragment(Varyings209990 input, bool isFrontFace : S
 {
     GBufferOutput209991 o;
     float tangentInputSign = input.tangentWS.w > 0.0 ? 1.0 : -1.0;
-    float3 n = normalize(input.normalWS);
-    float3 t = normalize(input.tangentWS.xyz);
-    float3 b = normalize(cross(n, t)) * tangentInputSign;
+    // Preserve the captured interpolated basis; normalize only the final normal.
+    float3 n = input.normalWS;
+    float3 t = input.tangentWS.xyz;
+    float3 b = cross(n, t) * tangentInputSign;
     float3x3 tbn = float3x3(t, b, n);
 
     float loc3x = input.loc3.x;
@@ -114,8 +116,19 @@ GBufferOutput209991 EID209991Fragment(Varyings209990 input, bool isFrontFace : S
     float twoSided = lerp(1.0, faceSign, step(0.5, _P03.x + loc3x + loc3y));
 
     float4 albedoSample = SAMPLE_TEXTURE2D_BIAS(_Res26, sampler_Res26, input.uv0, _EID209991MipBias);
-    clip(albedoSample.a - 0.5);
-    float3 albedo = loc3x != 0.0 ? albedoSample.rgb : saturate(albedoSample.rgb * _P09.rgb * _P06.x);
+    // EID1293 depth-only PS209965 determines EID3602 coverage before DepthEqual.
+    // Fold its alpha test into this combined depth/GBuffer draw, using this camera's view row.
+    float alphaCutoff = _AlphaCutoff;
+    if (_EID209965AlphaParams.z > 0.5)
+    {
+        float3 viewForward = normalize(UNITY_MATRIX_V[2].xyz);
+        float facing = abs(dot(viewForward, input.normalWS));
+        float coverage = smoothstep(_EID209965AlphaParams.y - 1.0,
+            1.0 - _EID209965AlphaParams.y, facing - _EID209965AlphaParams.x);
+        alphaCutoff = lerp(1.01, _AlphaCutoff, coverage);
+    }
+    clip(albedoSample.a - alphaCutoff);
+    float3 albedo = loc3x != 0.0 ? albedoSample.rgb : lerp(saturate(albedoSample.rgb * _P09.rgb * _P06.x), _P09.rgb, _P05.w);
 
     float4 nmSample = SAMPLE_TEXTURE2D_BIAS(_Res28, sampler_Res28, input.uv0, _EID209991MipBias);
     float4 packed = float4(nmSample.xy, 0.0, 0.0) * float4(2.0, 2.0, 0.0, 0.0) + float4(-1.0, -1.0, 1.0, -1.0);
@@ -133,21 +146,34 @@ GBufferOutput209991 EID209991Fragment(Varyings209990 input, bool isFrontFace : S
     float ndl = saturate(dot(normalWS, -sunDir));
     float wrap = pow(dot(normalWS, sunDir) * 0.5 + 0.5, _P05.z) * _P05.y;
     wrap = saturate(1.0 - wrap);
-    float wrapMask = lerp(1.0, nmSample.w, _P03.w) * wrap;
+    // PS209991 uniforms31: m14=P03.z, m41/42=P14.xy, m45..48=P15..18.
+    float3 capsuleDir = normalize(mul(sunDir, (float3x3)unity_ObjectToWorld));
+    float4 dx = float4(_P15.x, _P16.x, _P17.x, _P18.x) - input.objectPos.x;
+    float4 dy = float4(_P15.y, _P16.y, _P17.y, _P18.y) - input.objectPos.y;
+    float4 dz = float4(_P15.z, _P16.z, _P17.z, _P18.z) - input.objectPos.z;
+    float4 along = dx * capsuleDir.x + dy * capsuleDir.y + dz * capsuleDir.z;
+    float4 positive = max(0.0, along);
+    float4 px = dx - along * capsuleDir.x;
+    float4 pyOffset = dy - along * capsuleDir.y;
+    float4 pzOffset = dz - along * capsuleDir.z;
+    float4 occlusion = 1.0 - saturate((sqrt(positive * positive + px * px + pyOffset * pyOffset + pzOffset * pzOffset)
+        - float4(_P15.w, _P16.w, _P17.w, _P18.w)) / (1.00100004673 - _P14.y));
+    float capsuleVisibility = lerp(1.0, 1.0 - saturate(dot(occlusion, occlusion)), _P14.x);
+    float wrapMask = lerp(1.0, nmSample.w, _P03.z) * wrap * capsuleVisibility;
     wrapMask = lerp(wrapMask, 1.0, loc3x);
 
-    float distFade = _P06.y != 0.0 ? smoothstep(60.0, 50.0, 0.0) : 1.0;
+    float distFade = _P06.y != 0.0 ? smoothstep(60.0, 50.0, distance(GetCameraPositionWS(), TransformObjectToWorld(float3(0.0, 0.0, 0.0)))) : 1.0;
     float roughnessA;
     float materialY;
     if (_P06.z < 0.5)
     {
-        roughnessA = lerp(_P04.y, _P04.z, nmSample.z);
-        materialY = _P02.w * distFade;
+        roughnessA = lerp(_P04.y, _P04.z, 0.8);
+        materialY = _P02.w * nmSample.z * distFade;
     }
     else
     {
-        roughnessA = lerp(_P04.y, _P04.z, 0.8);
-        materialY = _P02.w * nmSample.z * distFade;
+        roughnessA = lerp(_P04.y, _P04.z, nmSample.z);
+        materialY = _P02.w * distFade;
     }
     float roughness = lerp(roughnessA, nmSample.z, loc3x);
     materialY = lerp(materialY, 0.0, loc3x);
@@ -155,7 +181,7 @@ GBufferOutput209991 EID209991Fragment(Varyings209990 input, bool isFrontFace : S
     float ao = saturate((1.0 - _P03.y) + nmSample.w * _P03.y);
     ao = lerp(ao, nmSample.w, loc3x);
     float materialZ = lerp(_P02.z, 0.0, loc3x);
-    float emissive = lerp(_P04.x, 0.0, loc3x);
+    float packedMaterial = lerp(_P03.w, 0.0, loc3x);
 
     float2 aoEdge = float2(_P08.x, _P08.z);
     float2 aoOuter = float2(_P08.x + _P08.y, _P08.z + _P08.w);
@@ -170,12 +196,13 @@ GBufferOutput209991 EID209991Fragment(Varyings209990 input, bool isFrontFace : S
     uint py = (uint)round(packedY * 127.0);
     uint pz = (uint)round(packedZ * 31.0);
     uint ndlu = (uint)round(ndl * 127.0);
-    uint eu = (uint)round(emissive * 31.0);
+    uint eu = (uint)round(packedMaterial * 31.0);
     uint wrapu = (uint)round(wrapMask * 127.0);
-    float rt2x = float((py << 3u) | ((pz >> 2u) & 7u)) * 0.0009765625;
+    // Captured RGB10 UNorm packing uses 1/1023; roundEven(3.5) encodes model 4.
+    float rt2x = float((py << 3u) | ((pz >> 2u) & 7u)) * 0.00097751710563898086548;
     float rt2w = float(pz & 3u) * 0.3333333433;
-    float rt2z = float((ndlu << 3u) | ((eu >> 2u) & 7u)) * 0.0009765625;
-    float rt2y = float((wrapu << 3u) | 3u) * 0.0009765625;
+    float rt2z = float((ndlu << 3u) | ((eu >> 2u) & 7u)) * 0.00097751710563898086548;
+    float rt2y = float((wrapu << 3u) | 4u) * 0.00097751710563898086548;
     float rt3w = float(eu & 3u) * 0.3333333433;
 
     float3 octN = normalize(normalWS);

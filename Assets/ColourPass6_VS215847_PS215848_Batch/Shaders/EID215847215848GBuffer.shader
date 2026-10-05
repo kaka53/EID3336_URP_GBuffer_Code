@@ -2,6 +2,12 @@ Shader "EID/URP/VS215847_PS215848_GBuffer"
 {
     Properties
     {
+        [Toggle] _EID3863WindEnabled ("实时风动（关闭还原捕获帧）", Float) = 0
+        _EID3863WindSpeed ("风动速度", Range(0,2)) = 0.25
+        _EID3863WindStrength ("风强度倍率", Range(0,3)) = 1
+        _EID3863WindDirection ("水平风向 XZ（使用 XY 分量）", Vector) = (0,1,0,0)
+
+        _EID3858AlphaCutoff ("Alpha Clip Threshold", Range(0,1)) = 0.5
         [Header(RenderDoc_Unique_Textures)]
         [NoScaleOffset] _Res25 ("res25 基础颜色 Binding4", 2D) = "white" {}
         [NoScaleOffset] _Res27 ("res27 extra/normal Binding3", 2D) = "bump" {}
@@ -51,7 +57,8 @@ Shader "EID/URP/VS215847_PS215848_GBuffer"
             Tags { "LightMode"="UniversalGBuffer" "UniversalMaterialType"="Lit" }
             Cull Off
             ZWrite On
-            ZTest Equal
+            // Standalone Unity GBuffer draw: no matching animated depth prepass.
+            ZTest LEqual
             Blend Off
             Stencil { Ref [_StencilRef] Comp Always Pass Replace ReadMask 255 WriteMask 255 }
             HLSLPROGRAM

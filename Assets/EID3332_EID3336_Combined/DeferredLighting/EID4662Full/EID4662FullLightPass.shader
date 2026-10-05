@@ -2,6 +2,11 @@ Shader "Hidden/EID3332Combined/Deferred/EID4662Full"
 {
     Properties
     {
+        [HideInInspector] _EID4662DebugStage ("Lighting stage (0 = original)", Float) = 0
+        [HideInInspector] _EID4662DebugExposure ("Stage preview multiplier", Float) = 1
+        [HideInInspector] _EID4662DebugDepthRange ("Stage depth range", Float) = 100
+        [Toggle] _EID4662VolumeLerpEnabled ("_39-_44 Sample Lerp To One", Float) = 0
+        _EID4662VolumeLerpWeight ("_39-_44 Lerp Weight", Range(0, 1)) = 0
         [HideInInspector] _17 ("Scene Depth", 2D) = "black" {}
         [HideInInspector] _18 ("Screen Specular Color", 2D) = "black" {}
         [HideInInspector] _19 ("Screen Specular Weight", 2D) = "black" {}

@@ -2,6 +2,10 @@ Shader "EID/URP/VS215543_PS215544_GBuffer"
 {
     Properties
     {
+        [Toggle] _EID215544AlphaClip ("Standalone Alpha Clip", Float) = 0
+        _EID215544AlphaCutoff ("Alpha Clip Threshold", Range(0,1)) = 0.5
+        [HideInInspector] _EID215544ZWrite ("Depth Write", Float) = 0
+        [HideInInspector] _EID215544ZTest ("Depth Test", Float) = 3
         [Header(RenderDoc_Unique_Textures)]
         _Res25 ("res25 基础颜色 Binding3", 2D) = "white" {}
         _Res27 ("res27 切线法线 Binding2", 2D) = "bump" {}
@@ -31,8 +35,8 @@ Shader "EID/URP/VS215543_PS215544_GBuffer"
             Name "VS215543_PS215544_UniversalGBuffer"
             Tags { "LightMode"="UniversalGBuffer" "UniversalMaterialType"="Lit" }
             Cull Off
-            ZWrite Off
-            ZTest Equal
+            ZWrite [_EID215544ZWrite]
+            ZTest [_EID215544ZTest]
             Blend Off
             Stencil { Ref 33 Comp Always Pass Replace ReadMask 255 WriteMask 255 }
             HLSLPROGRAM

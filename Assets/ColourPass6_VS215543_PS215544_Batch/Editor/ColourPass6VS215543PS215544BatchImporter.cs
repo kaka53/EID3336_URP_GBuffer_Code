@@ -215,6 +215,16 @@ public static class ColourPass6VS215543PS215544BatchImporter
         Material m = AssetDatabase.LoadAssetAtPath<Material>(path);
         if (m == null) { m = new Material(shader); AssetDatabase.CreateAsset(m, path); }
         m.shader = shader; m.name = "EID" + p.eid + " VS215543 PS215544";
+        // EID3694 has no matching prepass in the standalone reconstruction.
+        // Other family materials keep captured Equal/no-depth-write defaults.
+        if (p.eid == 3694)
+        {
+            m.SetFloat("_EID215544ZWrite", 1f);
+            m.SetFloat("_EID215544ZTest", 4f); // CompareFunction.LessEqual
+            m.SetFloat("_EID215544AlphaClip", 1f);
+            if (m.GetFloat("_EID215544AlphaCutoff") <= 0f)
+                m.SetFloat("_EID215544AlphaCutoff", 0.5f);
+        }
         byte[] local = ReadCB(p, "PS", "uniforms30");
         m.SetVector("_P00", ReadVector4(local, 0));
         m.SetVector("_P01", ReadVector4(local, 16));

@@ -267,6 +267,12 @@ public static class ColourPass6VS215447PS215448BatchImporter
         m.SetFloat("_UseBakedSkinning", HasCapturedSkinning(p) ? 1f : 0f);
         Texture albedo = LoadTexture(p, "res25");
         Texture normalTex = LoadTexture(p, "res26");
+        // Preserve EID1677's original BC5 row orientation; the legacy DDS importer flips this resource.
+        if (p.eid == 1677)
+        {
+            normalTex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/EID1677_TextureFix/rid223602_Captured.asset");
+            if (normalTex == null) throw new FileNotFoundException("Missing verified EID1677 BC5 normal asset.");
+        }
         Texture packed = LoadTextureByRid(Wave1FS57Rid[p.eid]);
         if (albedo == null || normalTex == null || packed == null)
             throw new FileNotFoundException("EID" + p.eid + " res25/res26/FS_57 texture binding is incomplete.");

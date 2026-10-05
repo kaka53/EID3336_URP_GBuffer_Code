@@ -9,6 +9,22 @@ Texture2D _Res32; SamplerState sampler_Res32;
 Texture2D _Res33; SamplerState sampler_Res33;
 Texture2D _Res34; SamplerState sampler_Res34;
 
+// Material opt-in; shared clock is advanced outside camera rendering.
+float _EID3863WindEnabled, _EID3863WindSpeed, _EID3863WindStrength;
+float4 _EID3863WindDirection, _EID3863WindTimes;
+SamplerState sampler_linear_repeat;
+float4 EID3858AnimatedWind(float4 captured, float time)
+{
+    if (_EID3863WindEnabled < 0.5) return captured;
+    float2 d=_EID3863WindDirection.xy;
+    d=dot(d,d)>1e-8?normalize(d):float2(0,1);
+    return float4(captured.x*max(_EID3863WindStrength,0),captured.y+time*_EID3863WindSpeed,d);
+}
+float4 EID3858WindNoise(float2 uv)
+{
+    if (_EID3863WindEnabled < 0.5) return _Res34.SampleLevel(sampler_Res34,uv,0);
+    return _Res34.SampleLevel(sampler_linear_repeat,frac(uv),0);
+}
 CBUFFER_START(UnityPerMaterial)
 float4 _P00; float4 _P01; float4 _P02; float4 _P03;
 float4 _P04; float4 _P05; float4 _P06; float4 _P07;
@@ -24,6 +40,7 @@ float4 _TerrainOrigin33;
 float4 _TerrainPad;
 float _WindGate;
 float _EID215848MipBias;
+float _EID3858AlphaCutoff;
 float _PrevBlend;
 CBUFFER_END
 
@@ -160,7 +177,7 @@ float3 EvaluateWind215847(float3 posOS, float3 posWS, float3 instanceT, float in
     float3 mixPos = lerp(posWS, windVecWS, _P19.x);
     float2 uv = mixPos.xz * _P19.z + mixPos.yy * 0.02;
     uv += (0.1 * (t + fieldW) * _P18.w).xx;
-    float4 noise = _Res34.SampleLevel(sampler_Res34, uv, 0);
+    float4 noise = EID3858WindNoise(uv);
     float2 nxy = noise.xy - 0.5;
     float blend = saturate(amp * 0.25 - 0.25);
     float nMix = lerp(nxy.x, nxy.y, blend);
@@ -188,7 +205,7 @@ float3 EvaluateWind215847(float3 posOS, float3 posWS, float3 instanceT, float in
         float3 flutterSrc = lerp(posOS, windVecOS, _P17.w.xxx);
         float3 flutterPos = instanceT * 0.01 + flutterSrc;
         float2 fuv = flutterPos.xz * (_P18.y * _P18.y) + flutterPos.yy * (_P17.x * 0.02);
-        float4 fn = _Res34.SampleLevel(sampler_Res34, fuv, 0);
+        float4 fn = EID3858WindNoise(fuv);
         float4 s = sin(float4(1.0, 0.5, 0.25, 0.125) * (fn.y * 25.132741 + t * _P17.z));
         float4 w = lerp(float4(0.5, 0.25, 0.125, 0.0625), 0.25.xxxx, _P17.x.xxxx);
         float flutter = dot(s, w) * ease;
@@ -222,8 +239,8 @@ Varyings215847 EID215847Vertex(Attributes215847 input)
     float3 windVecWS = mul(basis, windVecOS) + translation;
     float fade = 1.0 - _PrevBlend;
     float3 mixTerrain = lerp(windVecWS, positionWS, _P20.x);
-    float3 windNow = EvaluateWind215847(input.position, positionWS, translation, instanceScale, input.color, windVecOS, windVecWS, _WindA);
-    float3 windPrev = EvaluateWind215847(input.position, positionWS, translation, instanceScale, input.color, windVecOS, windVecWS, _WindB);
+    float3 windNow = EvaluateWind215847(input.position, positionWS, translation, instanceScale, input.color, windVecOS, windVecWS, EID3858AnimatedWind(_WindA, _EID3863WindTimes.x));
+    float3 windPrev = EvaluateWind215847(input.position, positionWS, translation, instanceScale, input.color, windVecOS, windVecWS, EID3858AnimatedWind(_WindB, _EID3863WindTimes.y));
     float3 t32 = SampleTerrain215847(_Res32, sampler_Res32, mixTerrain, _TerrainOrigin32, positionWS, windVecWS, input.color.y);
     float3 t33 = SampleTerrain215847(_Res33, sampler_Res33, mixTerrain, _TerrainOrigin33, positionWS, windVecWS, input.color.y);
     float3 worldNow = positionWS + (windNow + t32) * fade;
@@ -240,7 +257,7 @@ Varyings215847 EID215847Vertex(Attributes215847 input)
     o.tangentWS = float4(tangentWS, tangentOS.w);
     o.loc3 = input.color;
     o.currentClipXYW = clip.xyw;
-    o.previousClipXYW = prevClip.xyw;
+    o.previousClipXYW = _EID3863WindEnabled > 0.5 ? clip.xyw : prevClip.xyw;
     o.instanceId = idx;
     return o;
 }
@@ -269,6 +286,10 @@ GBufferOutput215848 EID215848Fragment(Varyings215847 input, bool isFrontFace : S
 
     float mip = _EID215848MipBias;
     float4 albedoSample = _Res25.SampleBias(sampler_Res25, input.uv0, mip);
+    // The captured Equal pass inherits coverage from an earlier depth draw.
+    // Our standalone GBuffer draw must also reject transparent texels before
+    // writing any MRT, depth or stencil. Use the same UV and mip as base color.
+    clip(albedoSample.a - _EID3858AlphaCutoff);
     float3 albedo = lerp(saturate(albedoSample.rgb * _P15.rgb * _P06.x), _P15.rgb, _P05.w);
 
     float4 extraSample = _Res27.SampleBias(sampler_Res27, input.uv0, mip);

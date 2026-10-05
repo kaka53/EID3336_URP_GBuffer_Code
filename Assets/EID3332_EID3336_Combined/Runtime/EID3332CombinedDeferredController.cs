@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
@@ -48,6 +48,43 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
     [Tooltip("LegacyB6 preserves the existing EID3336 B6 path. EID4662Full uses the isolated RenderDoc FS implementation and its own resources.")]
     public LightPassMode lightPassMode = LightPassMode.LegacyB6;
 
+    [Header("延迟光照阶段查看（4662 / 4666）")]
+    [Tooltip("按作用对象预览 4662 / 4666；Final 保持原输出。角色及后处理仍正常执行。")]
+    public EID4662LightingStage eid4662LightingStage = EID4662LightingStage.Final;
+    public EIDDeferredStageTarget deferredStageTarget = EIDDeferredStageTarget.Both;
+    public EID4662StageCameraScope eid4662StageCameraScope = EID4662StageCameraScope.Both;
+    [Range(-8f, 8f), Tooltip("仅调整阶段预览中的 HDR 光照颜色，不改变光照计算或最终画面。")]
+    public float eid4662StageExposureEV = 0f;
+    [Min(0.01f), Tooltip("线性深度预览的白色距离（世界单位）。")]
+    public float eid4662StageDepthRange = 100f;
+
+    // Keep serialized stage fields/ABI compatible with the original 4662 viewer.
+    public EID4662LightingStage GetEID4662LightingStage(Camera camera)
+    {
+        return GetDeferredLightingStage(camera, false);
+    }
+
+    public EID4662LightingStage GetEID4666LightingStage(Camera camera)
+    {
+        return GetDeferredLightingStage(camera, true);
+    }
+
+    EID4662LightingStage GetDeferredLightingStage(Camera camera, bool vegetation)
+    {
+        if ((int)eid4662LightingStage < 0 || (int)eid4662LightingStage > 29)
+            return EID4662LightingStage.Final;
+        if ((vegetation && deferredStageTarget == EIDDeferredStageTarget.Surface4662)
+            || (!vegetation && deferredStageTarget == EIDDeferredStageTarget.Vegetation4666)
+            || (!vegetation && (int)eid4662LightingStage >= 26))
+            return EID4662LightingStage.Final;
+        if (camera == null) return EID4662LightingStage.Final;
+        bool eligible = camera.cameraType == CameraType.Game || camera.cameraType == CameraType.SceneView;
+        if (!eligible || (eid4662StageCameraScope == EID4662StageCameraScope.Game && camera.cameraType != CameraType.Game)
+            || (eid4662StageCameraScope == EID4662StageCameraScope.Scene && camera.cameraType != CameraType.SceneView))
+            return EID4662LightingStage.Final;
+        return eid4662LightingStage;
+    }
+
     [Header("Shared B6 deferred lighting")]
     public bool enableB6Lighting = true;
     public Material b6LightingMaterial;
@@ -59,6 +96,13 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
     public EID4662FullLightPassBinding.RealtimeIndirectMode eid4662RealtimeIndirectMode = EID4662FullLightPassBinding.RealtimeIndirectMode.CurrentCapturedResources;
     [Tooltip("Diagnostic override for sampled deferred-light textures: leave unchanged, force sampled values to 0, or force them to 1.")]
     public EID4662FullLightPassBinding.SampleTextureOverrideMode eid4662SampleTextureOverride = EID4662FullLightPassBinding.SampleTextureOverrideMode.Unchanged;
+    [Header("EID4662 _39 - _44 Sample Lerp To One")]
+    [Tooltip("总开关：将 EID4662 的 _39～_44 所有 RGBA 采样值插值到 1。关闭保持原值，与 EID4666 独立。")]
+    public bool eid4662VolumeSamplesLerpToOne = false;
+    [Range(0f, 1f)]
+    [Tooltip("0=原始采样，1=全部通道为1；仅在总开关开启时生效。作用于解码前，不是最终光照强度。")]
+    public float eid4662VolumeSamplesLerpWeight = 0f;
+
     [Header("EID4662 Screen/Reflection Texture Controls")]
     [Tooltip("_18 插值目标，只能选择 0 或 1。")]
     public BinaryValueChoice eid4662Res18LerpValue = BinaryValueChoice.One;
@@ -527,6 +571,8 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
                 eid4662SampleTextureOverride, eid4662SampleTextureOverrideScope);
             // Keep _29 controls on the controller so the runtime per-camera
             // material receives the same values every frame.
+            material.SetFloat("_EID4662VolumeLerpEnabled", eid4662VolumeSamplesLerpToOne ? 1f : 0f);
+            material.SetFloat("_EID4662VolumeLerpWeight", Mathf.Clamp01(eid4662VolumeSamplesLerpWeight));
             material.SetFloat("_EID4662Res18LerpValue", (float)eid4662Res18LerpValue);
             material.SetFloat("_EID4662Res18LerpWeight", Mathf.Clamp01(eid4662Res18LerpWeight));
             material.SetFloat("_EID4662Res19LerpValue", (float)eid4662Res19LerpValue);
@@ -544,10 +590,15 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
             material.SetFloat("_EID4662Res38LerpValue", (float)eid4662Res38LerpValue);
             material.SetFloat("_EID4662Res38LerpWeight", Mathf.Clamp01(eid4662Res38LerpWeight));
             material.SetFloat("_EID4662Res38Threshold", Mathf.Clamp01(eid4662Res38Threshold));
+            // Per-camera material only: never publish stage selection as a shader global.
+            int debugStage = (int)GetEID4662LightingStage(camera);
+            material.SetFloat("_EID4662DebugStage", debugStage);
+            material.SetFloat("_EID4662DebugExposure", Mathf.Pow(2f, Mathf.Clamp(eid4662StageExposureEV, -8f, 8f)));
+            material.SetFloat("_EID4662DebugDepthRange", Mathf.Max(0.01f, eid4662StageDepthRange));
             material.SetFloat("_EID4662UseLiveCamera", useCapturedProjection ? 0f : 1f);
             // Live SceneView/Game output replaces the covered pixels. The
             // captured replay path keeps RenderDoc's original destination blend.
-            material.SetFloat("_EID4662PreserveDestination", useCapturedProjection ? 1f : 0f);
+            material.SetFloat("_EID4662PreserveDestination", useCapturedProjection && debugStage == 0 ? 1f : 0f);
 
             // EID4662's captured CB contains the original camera. Replace only
             // camera/screen-dependent values so SceneView and a moving Game
@@ -560,6 +611,7 @@ public sealed class EID3332CombinedDeferredController : MonoBehaviour, IEID3336U
             material.SetVector("_EID4662CameraPositionWS", new Vector4(cameraPosition.x, cameraPosition.y, cameraPosition.z, 1f));
             EndfieldCP2ExactReplayFeature.ApplyDeferredLightPassOverride(material, camera);
             EID4649ColourPass20Feature.ApplyDeferredLightPass29Override(material, camera);
+            EID4613ColourPass16Feature.ApplyDeferredScreenSH(material, camera);
             return true;
         }
         BindCapturedLightingInputsToMaterial(material);

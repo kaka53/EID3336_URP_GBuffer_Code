@@ -1,7 +1,12 @@
-Shader "Hidden/EID4666/VegetationLightPass"
+﻿Shader "Hidden/EID4666/VegetationLightPass"
 {
     Properties
     {
+        [HideInInspector] _EID4666DebugStage ("Lighting Stage", Float) = 0
+        [HideInInspector] _EID4666DebugExposure ("Stage Exposure", Float) = 1
+        [HideInInspector] _EID4666DebugDepthRange ("Stage Depth Range", Float) = 100
+        [Toggle] _EID4666VolumeLerpEnabled ("_39-_44 Sample Lerp To One", Float) = 0
+        _EID4666VolumeLerpWeight ("_39-_44 Lerp Weight", Range(0, 1)) = 0
         [HideInInspector] _17 ("Scene Depth", 2D) = "black" {}
         [HideInInspector] _18 ("Screen Specular Color", 2D) = "black" {}
         [HideInInspector] _19 ("Screen Specular Weight", 2D) = "black" {}

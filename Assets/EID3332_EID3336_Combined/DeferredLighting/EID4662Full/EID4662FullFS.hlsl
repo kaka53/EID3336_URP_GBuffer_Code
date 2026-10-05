@@ -285,8 +285,29 @@ struct EID_FS_Output
     float4 _5 : SV_Target0;
 };
 
+float _EID4662VolumeLerpEnabled;
+float _EID4662VolumeLerpWeight;
+
+// Applies to encoded RGBA samples before the existing irradiance/SH decode.
+// Disabled and weight-zero paths preserve the original sample exactly.
+float4 EID4662_ApplyVolumeSampleOverride(float4 sampleValue)
+{
+    if (_EID4662VolumeLerpEnabled < 0.5f || _EID4662VolumeLerpWeight <= 0.0f)
+        return sampleValue;
+    return lerp(sampleValue, float4(1.0f, 1.0f, 1.0f, 1.0f), saturate(_EID4662VolumeLerpWeight));
+}
+
+// Controller binds these on each camera's runtime material. Stage 0 is untouched.
+float _EID4662DebugStage;
+float _EID4662DebugExposure;
+float _EID4662DebugDepthRange;
+
 void frag_main()
 {
+    int debugStage = (int)_EID4662DebugStage;
+    float3 debugDirect = 0.0f.xxx;
+    float3 debugScreenReflection = 0.0f.xxx;
+    float debugScreenWeight = 0.0f;
     uint2 _295 = uint2(gl_FragCoord.xy);
     int _298 = int(_295.x);
     int _299 = int(_295.y);
@@ -392,7 +413,7 @@ void frag_main()
     float _470 = saturate(lerp(_470Raw, saturate(_EID4662Res29LerpValue), saturate(_EID4662Res29LerpWeight)));
     float _470Threshold = max(0.0f, _EID4662Res29Threshold);
     float4 _606;
-    if (_470 > _470Threshold)
+    if ((_470 > _470Threshold) || debugStage == 5)
     {
         float3 _480 = reflect(_390, _332);
         float3 _481 = -_28_m0.xyz;
@@ -415,12 +436,13 @@ void frag_main()
         float _572 = 1.0f - _571;
         float3 _575 = _430 + ((1.0f.xxx - _430) * 0.0476190485060214996337890625f);
         float3 _591 = ((clamp((min(((_430 * (1.0f - _540)) + _540.xxx) * ((_440 / (_534 * _534)) * (0.5f / (((_508 * sqrt(((((-_513) * _440) + _513) * _513) + _440)) + (_513 * sqrt(((((-_508) * _440) + _508) * _508) + _440))) + 9.9999997473787516355514526367188e-05f))), 2048.0f.xxx) + (((_575 * (((_32.SampleLevel(sampler_LinearClamp, (float2(_513, _422) * 0.96875f) + 0.015625f.xx, 0.0f).x * _32.SampleLevel(sampler_LinearClamp, (float2(_508, _422) * 0.96875f) + 0.015625f.xx, 0.0f).x) * _571) / _572)) * _575) / (1.0f.xxx - (_575 * _572)))) * _28_m4.x, 0.0f.xxx, 1000.0f.xxx) * _508) + ((_426 * 1.0f) * _508)) * _28_m1.xyz;
+        debugDirect = _591;
         float _33Raw = saturate(_33.SampleLevel(sampler_LinearClamp, _350, 0.0f).x);
         float _33Value = saturate(lerp(_33Raw, saturate(_EID4662Res33LerpValue), saturate(_EID4662Res33LerpWeight)));
         float _33Threshold = max(0.0f, _EID4662Res33Threshold);
         float _33Visibility = (_33Value >= _33Threshold) ? _33Value : 0.0f;
         float3 _604 = lerp(_591, _591 * _30.SampleBias(sampler_LinearClamp, float2(_470, 0.5f), _9_m16).xyz, (1.0f - _470).xxx) * _33Visibility.xxx;
-        _606 = float4(_604.x, _604.y, _604.z, 0.0f.xxxx.w);
+        _606 = (_470 > _470Threshold) ? float4(_604.x, _604.y, _604.z, 0.0f.xxxx.w) : 0.0f.xxxx;
     }
     else
     {
@@ -466,19 +488,19 @@ void frag_main()
         {
             float3 _732 = ((_663 * 2.0f) + 0.5f.xxx) * _9_m106.xyz;
             float3 _734 = _732 - floor(_732);
-            float4 _738 = _39.SampleLevel(sampler_LinearRepeat, _734, 0.0f);
+            float4 _738 = EID4662_ApplyVolumeSampleOverride(_39.SampleLevel(sampler_LinearRepeat, _734, 0.0f));
             float _739 = 1.0f - _723;
             float _743 = _9_m106.y * 0.5f;
             float _748 = _734.x;
             float _749 = clamp(_734.y, _743, 1.0f - _743) * 0.3333333432674407958984375f;
             float _750 = _734.z;
-            float4 _753 = _40.SampleLevel(sampler_LinearClamp, float3(_748, _749, _750), 0.0f);
+            float4 _753 = EID4662_ApplyVolumeSampleOverride(_40.SampleLevel(sampler_LinearClamp, float3(_748, _749, _750), 0.0f));
             float _769 = _738.x;
             float _779 = _738.y;
             float _789 = _738.z;
             _799 = _696 + (_753.w * _739);
-            _800 = float4(((_40.SampleLevel(sampler_LinearClamp, float3(_748, _749 + 0.666666686534881591796875f, _750), 0.0f).xyz * 4.0f) - 2.0f.xxx) * _789, _789) * _739;
-            _801 = float4(((_40.SampleLevel(sampler_LinearClamp, float3(_748, _749 + 0.3333333432674407958984375f, _750), 0.0f).xyz * 4.0f) - 2.0f.xxx) * _779, _779) * _739;
+            _800 = float4(((EID4662_ApplyVolumeSampleOverride(_40.SampleLevel(sampler_LinearClamp, float3(_748, _749 + 0.666666686534881591796875f, _750), 0.0f)).xyz * 4.0f) - 2.0f.xxx) * _789, _789) * _739;
+            _801 = float4(((EID4662_ApplyVolumeSampleOverride(_40.SampleLevel(sampler_LinearClamp, float3(_748, _749 + 0.3333333432674407958984375f, _750), 0.0f)).xyz * 4.0f) - 2.0f.xxx) * _779, _779) * _739;
             _802 = float4(((_753.xyz * 4.0f) - 2.0f.xxx) * _769, _769) * _739;
         }
         else
@@ -498,19 +520,19 @@ void frag_main()
         {
             float3 _831 = ((_663 * 0.5f) + 0.5f.xxx) * _9_m106.xyz;
             float3 _833 = _831 - floor(_831);
-            float4 _837 = _41.SampleLevel(sampler_LinearRepeat, _833, 0.0f);
+            float4 _837 = EID4662_ApplyVolumeSampleOverride(_41.SampleLevel(sampler_LinearRepeat, _833, 0.0f));
             float _839 = _723 * (1.0f - _822);
             float _843 = _9_m106.y * 0.5f;
             float _848 = _833.x;
             float _849 = clamp(_833.y, _843, 1.0f - _843) * 0.3333333432674407958984375f;
             float _850 = _833.z;
-            float4 _853 = _42.SampleLevel(sampler_LinearClamp, float3(_848, _849, _850), 0.0f);
+            float4 _853 = EID4662_ApplyVolumeSampleOverride(_42.SampleLevel(sampler_LinearClamp, float3(_848, _849, _850), 0.0f));
             float _869 = _837.x;
             float _880 = _837.y;
             float _891 = _837.z;
             _902 = _799 + (_853.w * _839);
-            _903 = _800 + (float4(((_42.SampleLevel(sampler_LinearClamp, float3(_848, _849 + 0.666666686534881591796875f, _850), 0.0f).xyz * 4.0f) - 2.0f.xxx) * _891, _891) * _839);
-            _904 = _801 + (float4(((_42.SampleLevel(sampler_LinearClamp, float3(_848, _849 + 0.3333333432674407958984375f, _850), 0.0f).xyz * 4.0f) - 2.0f.xxx) * _880, _880) * _839);
+            _903 = _800 + (float4(((EID4662_ApplyVolumeSampleOverride(_42.SampleLevel(sampler_LinearClamp, float3(_848, _849 + 0.666666686534881591796875f, _850), 0.0f)).xyz * 4.0f) - 2.0f.xxx) * _891, _891) * _839);
+            _904 = _801 + (float4(((EID4662_ApplyVolumeSampleOverride(_42.SampleLevel(sampler_LinearClamp, float3(_848, _849 + 0.3333333432674407958984375f, _850), 0.0f)).xyz * 4.0f) - 2.0f.xxx) * _880, _880) * _839);
             _905 = _802 + (float4(((_853.xyz * 4.0f) - 2.0f.xxx) * _869, _869) * _839);
         }
         else
@@ -529,18 +551,18 @@ void frag_main()
             float3 _914 = ((_663 * 0.125f) + 0.5f.xxx) * _9_m106.xyz;
             float3 _917 = _9_m106.xyz * 0.5f;
             float3 _919 = clamp(_914 - floor(_914), _917, 1.0f.xxx - _917);
-            float4 _923 = _43.SampleLevel(sampler_LinearRepeat, _919, 0.0f);
+            float4 _923 = EID4662_ApplyVolumeSampleOverride(_43.SampleLevel(sampler_LinearRepeat, _919, 0.0f));
             float _925 = _822 * (1.0f - _696);
             float _929 = _9_m106.y * 0.5f;
             float _934 = _919.x;
             float _935 = clamp(_919.y, _929, 1.0f - _929) * 0.3333333432674407958984375f;
             float _936 = _919.z;
-            float4 _939 = _44.SampleLevel(sampler_LinearClamp, float3(_934, _935, _936), 0.0f);
+            float4 _939 = EID4662_ApplyVolumeSampleOverride(_44.SampleLevel(sampler_LinearClamp, float3(_934, _935, _936), 0.0f));
             float _955 = _923.x;
             float _966 = _923.y;
             float _977 = _923.z;
-            _988 = _903 + (float4(((_44.SampleLevel(sampler_LinearClamp, float3(_934, _935 + 0.666666686534881591796875f, _936), 0.0f).xyz * 4.0f) - 2.0f.xxx) * _977, _977) * _925);
-            _989 = _904 + (float4(((_44.SampleLevel(sampler_LinearClamp, float3(_934, _935 + 0.3333333432674407958984375f, _936), 0.0f).xyz * 4.0f) - 2.0f.xxx) * _966, _966) * _925);
+            _988 = _903 + (float4(((EID4662_ApplyVolumeSampleOverride(_44.SampleLevel(sampler_LinearClamp, float3(_934, _935 + 0.666666686534881591796875f, _936), 0.0f)).xyz * 4.0f) - 2.0f.xxx) * _977, _977) * _925);
+            _989 = _904 + (float4(((EID4662_ApplyVolumeSampleOverride(_44.SampleLevel(sampler_LinearClamp, float3(_934, _935 + 0.3333333432674407958984375f, _936), 0.0f)).xyz * 4.0f) - 2.0f.xxx) * _966, _966) * _925);
             _990 = _905 + (float4(((_939.xyz * 4.0f) - 2.0f.xxx) * _955, _955) * _925);
             _991 = _902 + (_939.w * _925);
         }
@@ -756,6 +778,8 @@ void frag_main()
         float3 _18Raw = _18.SampleBias(sampler_LinearClamp, _4, _9_m16).xyz;
         float _18Weight = saturate(_EID4662Res18LerpWeight);
         float3 _18Value = lerp(_18Raw, _EID4662Res18LerpValue.xxx, _18Weight);
+        debugScreenReflection = _18Value;
+        debugScreenWeight = _1543;
         _1548 = (_18Value * _1543) + (_1525 * (1.0f - _1543));
     }
     else
@@ -815,6 +839,54 @@ void frag_main()
     float3 _1937 = (clamp(_1553.xyz, 0.0f.xxx, 255.0f.xxx).xyz * _1935) + ((((clamp(((_9_m46.xyz * (0.0596831031143665313720703125f * (1.0f + (_1593 * _1593)))) + _9_m48.xyz) + (_9_m47.xyz * ((1.0f - _1599) / max((12.56637096405029296875f * _1603) * sqrt(_1603), 0.001000000047497451305389404296875f))), 0.0f.xxx, 1.0f.xxx) * 255.0f) * (1.0f.xxx - _1590)) * _1932) + _1931);
     float4 _1939 = float4(_1937.x, _1937.y, _1937.z, _1553.w);
     _1939.w = dot(_1935, 0.3333333432674407958984375f.xxx);
+    // Diagnostic selection is after the complete calculation: no upstream textures
+    // are replaced and no intermediates are fed back into the lighting algorithm.
+    if (debugStage != 0)
+    {
+        float3 irradiance = float3(_1227, _1232, _1237) * _9_m22.x;
+        float3 indirectDiffuse = (irradiance * _426) * _646;
+        float3 indirectSpecular = (_1548 * (_455 + ((_430 * ((1.0f - _456) / _456)) * _455))) * _645;
+        float3 preview = _1939.xyz;
+        bool hdr = false;
+        switch (debugStage)
+        {
+            case 1: preview = _424; break;
+            case 2: preview = _332 * 0.5f + 0.5f; break;
+            case 3: preview = float3(_308, _422, _309); break;
+            case 4: preview = saturate(_369 / max(_EID4662DebugDepthRange, 0.01f)).xxx; break;
+            case 5: preview = debugDirect; hdr = true; break;
+            case 6: preview = _470.xxx; break;
+            // Show the effective input even where the main-light branch was skipped.
+            case 7:
+            {
+                float contact = saturate(lerp(saturate(_33.SampleLevel(sampler_LinearClamp, _350, 0.0f).x),
+                    saturate(_EID4662Res33LerpValue), saturate(_EID4662Res33LerpWeight)));
+                preview = ((contact >= max(0.0f, _EID4662Res33Threshold)) ? contact : 0.0f).xxx;
+                break;
+            }
+            case 8: preview = _606.xyz; hdr = true; break;
+            case 9: preview = _646; break;
+            case 10: preview = _645; break;
+            case 11: preview = max(0.0f.xxx, float3(dot(_1022.xyz, _332) + _1022.w,
+                dot(_1042.xyz, _332) + _1042.w, dot(_1062.xyz, _332) + _1062.w)) * _9_m22.x; hdr = true; break;
+            case 12: preview = irradiance; hdr = true; break;
+            case 13: preview = indirectDiffuse; hdr = true; break;
+            case 14: preview = _1525; hdr = true; break;
+            case 15: preview = debugScreenReflection; hdr = true; break;
+            case 16: preview = debugScreenWeight.xxx; break;
+            case 17: preview = _1548; hdr = true; break;
+            case 18: preview = indirectSpecular; hdr = true; break;
+            case 19: preview = _1551; hdr = true; break;
+            case 20: preview = _606.xyz + indirectDiffuse; hdr = true; break;
+            case 21: preview = _1553.xyz; hdr = true; break;
+            case 22: preview = _1935; break;
+            case 23: preview = _1937 - clamp(_1553.xyz, 0.0f.xxx, 255.0f.xxx) * _1935; hdr = true; break;
+            case 24: preview = _1939.xyz; hdr = true; break;
+            case 25: preview = _455; break;
+        }
+        // Debug must not retain destination lighting through the fog alpha.
+        _1939 = float4(preview * (hdr ? max(_EID4662DebugExposure, 0.0f) : 1.0f), 0.0f);
+    }
     _5 = _1939;
 }
 

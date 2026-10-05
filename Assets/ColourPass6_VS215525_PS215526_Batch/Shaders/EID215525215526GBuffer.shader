@@ -3,13 +3,13 @@ Shader "EID/URP/VS215525_PS215526_GBuffer"
     Properties
     {
         [Header(RenderDoc_Unique_Textures)]
-        _Res28 ("res28 基础颜色 Binding8", 2D) = "white" {}
-        _Res30 ("res30 切线法线 Binding2", 2D) = "bump" {}
-        _Res32 ("res32 细节叠加 Binding3", 2D) = "gray" {}
-        _Res33 ("res33 额外遮罩 Binding4", 2D) = "white" {}
-        _Res34 ("res34 额外混合 Binding7", 2D) = "white" {}
-        _Res35 ("res35 额外颜色 Binding6", 2D) = "white" {}
-        _Res36 ("res36 额外法线 Binding5", 2D) = "bump" {}
+        [NoScaleOffset] _Res28 ("res28 基础颜色 Binding8", 2D) = "white" {}
+        [NoScaleOffset] _Res30 ("res30 切线法线 Binding2", 2D) = "bump" {}
+        [NoScaleOffset] _Res32 ("res32 细节叠加 Binding3", 2D) = "gray" {}
+        [NoScaleOffset] _Res33 ("res33 额外遮罩 Binding4", 2D) = "white" {}
+        [NoScaleOffset] _Res34 ("res34 额外混合 Binding7", 2D) = "white" {}
+        [NoScaleOffset] _Res35 ("res35 额外颜色 Binding6", 2D) = "white" {}
+        [NoScaleOffset] _Res36 ("res36 额外法线 Binding5", 2D) = "bump" {}
         [Header(RenderDoc_PS_uniforms38_c00_c37)]
         _P00 ("c00 法线强度及粗糙度范围", Vector) = (1,0,0,1)
         _P01 ("c01 AO与双面法线", Vector) = (1,0,0,1)
@@ -62,7 +62,7 @@ Shader "EID/URP/VS215525_PS215526_GBuffer"
             Tags { "LightMode"="UniversalGBuffer" "UniversalMaterialType"="Lit" }
             Cull Back
             ZWrite On
-            ZTest GEqual
+            ZTest LEqual
             Blend Off
             Stencil { Ref 0 Comp Always Pass Replace ReadMask 255 WriteMask 255 }
             HLSLPROGRAM

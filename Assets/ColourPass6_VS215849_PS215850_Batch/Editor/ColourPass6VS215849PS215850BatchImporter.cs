@@ -449,6 +449,10 @@ public static class ColourPass6VS215849PS215850BatchImporter
             EditorUtility.SetDirty(binder);
             renderers++;
         }
+        // EID3863 already has a complete editable 297-instance reconstruction.
+        // Keep the batch asset, but do not draw the same capture twice.
+        int duplicateDraws = EID3863CaptureRepair.DisableDuplicateBatch(scene);
+        report.AppendLine("EID3863DisabledDuplicateDraws=" + duplicateDraws);
         EditorSceneManager.MarkSceneDirty(scene);
         EditorSceneManager.SaveScene(scene);
         report.AppendLine("scene=" + TargetScene);

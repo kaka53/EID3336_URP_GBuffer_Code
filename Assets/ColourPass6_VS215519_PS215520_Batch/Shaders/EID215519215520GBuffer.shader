@@ -75,7 +75,10 @@ Shader "EID/URP/VS215519_PS215520_GBuffer"
             Tags { "LightMode"="UniversalGBuffer" "UniversalMaterialType"="Lit" }
             Cull Back
             ZWrite On
-            ZTest GEqual
+            // RenderDoc records the backend reversed-Z comparison (GreaterEqual).
+            // ShaderLab uses logical depth order; Unity reverses LEqual on Vulkan.
+            // GEqual here reverses it twice and lets farther surfaces win.
+            ZTest LEqual
             Blend Off
             Stencil { Ref 0 Comp Always Pass Replace ReadMask 255 WriteMask 255 }
             HLSLPROGRAM

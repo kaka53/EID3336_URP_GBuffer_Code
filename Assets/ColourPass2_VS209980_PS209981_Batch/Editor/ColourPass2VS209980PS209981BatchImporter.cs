@@ -369,7 +369,18 @@ public static class ColourPass2VS209980PS209981BatchImporter
         }
         report.AppendLine("uniqueTextureRIDs=" + m.textureDatabase.Length + " (one asset per RID)");
     }
-    static Texture LoadTexture(Profile p, string name) { int rid = Rid(p, name); return AssetDatabase.LoadAssetAtPath<Texture>(Root + "/TextureDatabase/rid" + rid + ".dds"); }
+    static Texture LoadTexture(Profile p, string name)
+    {
+        // DDS uses IHVImageFormatImporter, not TextureImporter. Preserve the
+        // EID2842 linear normal/roughness import instead of the shared sRGB DDS.
+        if (p.eid == 2842 && name == "res25")
+            return AssetDatabase.LoadAssetAtPath<Texture>("Assets/EID2842_TextureFix/rid256303_Linear.dds");
+        // EID2916 res25 is BC7_UNORM data, never sRGB; preserve its verified import override.
+        if (p.eid == 2916 && name == "res25")
+            return AssetDatabase.LoadAssetAtPath<Texture>("Assets/EID2916_TextureFix/rid278699_Linear.dds");
+        int rid = Rid(p, name);
+        return AssetDatabase.LoadAssetAtPath<Texture>(Root + "/TextureDatabase/rid" + rid + ".dds");
+    }
     static int Rid(Profile p, string name) { TextureRef t = p.textures.FirstOrDefault(x => x.name == name); return t == null ? 0 : t.rid; }
 
     static Vector4 DecodeUNorm4(byte[] b) => new Vector4(b[0] / 255f, b[1] / 255f, b[2] / 255f, b[3] / 255f);

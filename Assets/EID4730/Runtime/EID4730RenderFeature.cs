@@ -342,9 +342,10 @@ namespace EID4730
                     // Bind each capture immediately before its draw, never both here.
                     CameraData cameraData = renderingData.cameraData;
                     Matrix4x4 view = cameraData.GetViewMatrix();
-                    Matrix4x4 gpuProjection = cameraData.GetGPUProjectionMatrix();
                     cmd.SetViewProjectionMatrices(view, cameraData.GetProjectionMatrix());
-                    cmd.SetGlobalMatrix("unity_MatrixVP", gpuProjection * view);
+                    // Match the native VP product used by the GBuffer depth pass.
+                    // Recomputing unity_MatrixVP in C# can differ by one ULP and reject
+                    // character pixels under ZTest Equal as the camera moves.
                     cmd.SetGlobalVector("_WorldSpaceCameraPos", cameraData.worldSpaceCameraPos);
                     color = colorTarget != null ? colorTarget : cameraData.renderer.cameraColorTargetHandle;
                     depth = depthTarget != null ? depthTarget : cameraData.renderer.cameraDepthTargetHandle;

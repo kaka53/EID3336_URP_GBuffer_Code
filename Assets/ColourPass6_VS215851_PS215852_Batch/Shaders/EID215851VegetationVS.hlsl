@@ -198,6 +198,12 @@ Texture2D<float4> _EID3863VSRes36 : register(t1);
 Texture2D<float4> _EID3863VSRes37 : register(t0);
 
 #include "EID215851CapturedConstants.hlsl"
+float4 EID3863SampleWindNoise(float2 uv)
+{
+    if (_EID3863WindEnabled < 0.5) return _EID3863VSRes37.SampleLevel(sampler_linear_clamp,uv,0);
+    return _EID3863VSRes37.SampleLevel(sampler_linear_repeat,frac(uv),0);
+}
+
 
 static float4 VSglXPosition;
 static int VSglXInstanceIndex;
@@ -280,7 +286,7 @@ void vert_main()
     float2 _318 = _317 * 0.0500000007450580596923828125f;
     float _319 = _25_m25.x * 0.20000000298023223876953125f;
     float _320 = 1.0f - _319;
-    float4 _331 = _EID3863VSRes37.SampleLevel(sampler_linear_clamp, _318 + (_25_m26.xy * _39_m31), 0.0f);
+    float4 _331 = EID3863SampleWindNoise(_318 + (_25_m26.xy * _39_m31));
     float _333 = _331.y;
     float _345 = _218 * _218;
     bool _349 = _25_m36.x > 0.0f;
@@ -697,7 +703,7 @@ void vert_main()
     } while(false);
     float _1024 = _25_m37.x * 0.20000000298023223876953125f;
     float _1025 = 1.0f - _1024;
-    float4 _1036 = _EID3863VSRes37.SampleLevel(sampler_linear_clamp, _318 + (_25_m26.zw * _39_m31), 0.0f);
+    float4 _1036 = EID3863SampleWindNoise(_318 + (_25_m26.zw * _39_m31));
     float _1038 = _1036.y;
     float3 _1161;
     float _1162;

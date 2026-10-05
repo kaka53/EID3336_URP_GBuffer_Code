@@ -102,4 +102,35 @@ CBUFFER_END
 #define _39_m30 _EID215851Wind2.y
 #define _39_m31 _EID215851Wind2.z
 
+// Material controls; the shared clock is published once per frame, never per camera.
+float _EID3863WindEnabled;
+float _EID3863WindSpeed;
+float _EID3863WindStrength;
+float4 _EID3863WindDirection;
+float4 _EID3863WindTimes; // current seconds, previous seconds; global (not a material property)
+float2 EID3863WindDirectionXZ()
+{
+    float2 d = _EID3863WindDirection.xy;
+    return dot(d,d) > 1e-8 ? normalize(d) : float2(0,1);
+}
+float4 EID3863AnimatedWind(float4 captured)
+{
+    if (_EID3863WindEnabled < 0.5) return captured;
+    float2 direction = EID3863WindDirectionXZ();
+    return float4(captured.x * max(_EID3863WindStrength,0.0), captured.y, direction);
+}
+float4 EID3863WindOffsets()
+{
+    if (_EID3863WindEnabled < 0.5) return EID3863_25_m26;
+    float2 velocity = -EID3863WindDirectionXZ() * _EID3863WindSpeed;
+    return EID3863_25_m26 + float4(velocity * _EID3863WindTimes.x, velocity * _EID3863WindTimes.y);
+}
+#undef _25_m25
+#undef _25_m37
+#undef _25_m26
+#define _25_m25 EID3863AnimatedWind(EID3863_25_m25)
+#define _25_m37 EID3863AnimatedWind(EID3863_25_m37)
+#define _25_m26 EID3863WindOffsets()
+
+
 #endif

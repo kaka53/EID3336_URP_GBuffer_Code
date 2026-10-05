@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
@@ -15,6 +15,13 @@ public sealed class EID4666VegetationLightPassFeature : ScriptableRendererFeatur
         public bool renderInGameView = true;
         public bool renderInSceneView = true;
         public bool enabledForCamera = true;
+
+        [Header("_39 - _44 Sample Lerp To One")]
+        [Tooltip("总开关：将 _39～_44 的所有 RGBA 采样值插值到 1。关闭时保留原始采样，不影响其它 EID。")]
+        public bool volumeSamplesLerpToOne = false;
+        [Range(0f, 1f)]
+        [Tooltip("0=原始采样，1=全部通道为1；仅在总开关开启时生效。作用于解码之前的纹理采样，不是最终光照强度。")]
+        public float volumeSamplesLerpWeight = 0f;
     }
 
     public Settings settings = new Settings();
@@ -119,12 +126,24 @@ public sealed class EID4666VegetationLightPassFeature : ScriptableRendererFeatur
             return;
 
         pass.renderPassEvent = settings.injectionPoint;
+        pass.SetVolumeSampleOverride(settings.volumeSamplesLerpToOne, settings.volumeSamplesLerpWeight);
         pass.ConfigureInput(ScriptableRenderPassInput.None);
         renderer.EnqueuePass(pass);
     }
 
     sealed class Pass : ScriptableRenderPass
     {
+        static readonly int IdVolumeLerpEnabled = Shader.PropertyToID("_EID4666VolumeLerpEnabled");
+        static readonly int IdVolumeLerpWeight = Shader.PropertyToID("_EID4666VolumeLerpWeight");
+        bool volumeLerpEnabled;
+        float volumeLerpWeight;
+
+        public void SetVolumeSampleOverride(bool enabled, float weight)
+        {
+            volumeLerpEnabled = enabled;
+            volumeLerpWeight = Mathf.Clamp01(weight);
+        }
+
         static readonly int Id17 = Shader.PropertyToID("_17");
         static readonly int Id18 = Shader.PropertyToID("_18");
         static readonly int Id19 = Shader.PropertyToID("_19");
@@ -241,6 +260,13 @@ public sealed class EID4666VegetationLightPassFeature : ScriptableRendererFeatur
                 BindLiveCamera(material, controller, camera, ref renderingData, useCapturedProjection);
                 EndfieldCP2ExactReplayFeature.ApplyDeferredLightPassOverride(material, camera);
                 EID4649ColourPass20Feature.ApplyDeferredLightPass29Override(material, camera);
+                EID4613ColourPass16Feature.ApplyDeferredScreenSH(material, camera);
+                material.SetFloat(IdVolumeLerpEnabled, volumeLerpEnabled ? 1f : 0f);
+                material.SetFloat(IdVolumeLerpWeight, volumeLerpWeight);
+                // Snapshot selection per actual camera; never use shared shader globals.
+                material.SetFloat("_EID4666DebugStage", (int)controller.GetEID4666LightingStage(camera));
+                material.SetFloat("_EID4666DebugExposure", Mathf.Pow(2f, Mathf.Clamp(controller.eid4662StageExposureEV, -8f, 8f)));
+                material.SetFloat("_EID4666DebugDepthRange", Mathf.Max(0.01f, controller.eid4662StageDepthRange));
                 FillPropertyBlock(material);
                 if (bound)
                     cmd.DrawProcedural(Matrix4x4.identity, material, 0, MeshTopology.Triangles, 3, 1, propertyBlock);
@@ -355,6 +381,11 @@ public sealed class EID4666VegetationLightPassFeature : ScriptableRendererFeatur
         void FillPropertyBlock(Material material)
         {
             propertyBlock.Clear();
+            propertyBlock.SetFloat("_EID4666DebugStage", material.GetFloat("_EID4666DebugStage"));
+            propertyBlock.SetFloat("_EID4666DebugExposure", material.GetFloat("_EID4666DebugExposure"));
+            propertyBlock.SetFloat("_EID4666DebugDepthRange", material.GetFloat("_EID4666DebugDepthRange"));
+            propertyBlock.SetFloat(IdVolumeLerpEnabled, material.GetFloat(IdVolumeLerpEnabled));
+            propertyBlock.SetFloat(IdVolumeLerpWeight, material.GetFloat(IdVolumeLerpWeight));
             for (int i = 0; i < TextureIds.Length; ++i)
             {
                 Texture texture = material.GetTexture(TextureIds[i]);

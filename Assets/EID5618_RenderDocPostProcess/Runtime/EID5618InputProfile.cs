@@ -14,6 +14,7 @@ public sealed class EID5618InputProfile : ScriptableObject
         CapturedEID5537 = 0,
         GeneratedEID5537 = 1,
         LiveCameraColor = 2,
+        EID5537RenderFeature = 3,
     }
 
     [Header("EID5618 captured inputs")]

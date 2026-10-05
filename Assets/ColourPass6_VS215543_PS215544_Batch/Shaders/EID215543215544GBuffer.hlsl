@@ -13,6 +13,8 @@ float4 _P08; float4 _P09; float4 _P10; float4 _P11;
 float4 _P12; float4 _P13;
 float4 _SunDir;
 float _EID215544MipBias;
+float _EID215544AlphaClip;
+float _EID215544AlphaCutoff;
 CBUFFER_END
 
 struct Attributes215543
@@ -109,6 +111,10 @@ GBufferOutput215544 EID215544Fragment(Varyings215543 input, bool isFrontFace : S
     float twoSided = lerp(1.0, faceSign, step(0.5, _P03.x + loc3x + loc3y));
 
     float4 albedoSample = SAMPLE_TEXTURE2D_BIAS(_Res25, sampler_Res25, input.uv0, _EID215544MipBias);
+    // The capture's Equal pass consumes pre-existing cutout depth. A standalone
+    // draw must establish the same coverage before writing GBuffer/depth/stencil.
+    if (_EID215544AlphaClip > 0.5)
+        clip(albedoSample.a - _EID215544AlphaCutoff);
     float3 albedo = albedoSample.rgb;
 
     float4 nmSample = SAMPLE_TEXTURE2D_BIAS(_Res27, sampler_Res27, input.uv0, _EID215544MipBias);

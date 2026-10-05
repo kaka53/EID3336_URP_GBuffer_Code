@@ -197,12 +197,14 @@ public sealed class EID4662FullLightPassBinding
         SetTexture(material, "_34", "volumetric_fog_b17.asset");
         SetTexture(material, "_37", "sh_decode_lut_b25.asset");
         SetTexture(material, "_38", "screen_sh_b5.asset");
-        SetTexture(material, "_39", "irr_weight_coarse_b14.asset");
-        SetTexture(material, "_40", "irr_data_coarse_b11.asset");
+        // Match the captured shader slots: fine uses world * 2, coarse uses
+        // world * 0.125. Swapping these levels creates false dark GI bands.
+        SetTexture(material, "_39", "irr_weight_fine_b16.asset");
+        SetTexture(material, "_40", "irr_data_fine_b13.asset");
         SetTexture(material, "_41", "irr_weight_medium_b15.asset");
         SetTexture(material, "_42", "irr_data_medium_b12.asset");
-        SetTexture(material, "_43", "irr_weight_fine_b16.asset");
-        SetTexture(material, "_44", "irr_data_fine_b13.asset");
+        SetTexture(material, "_43", "irr_weight_coarse_b14.asset");
+        SetTexture(material, "_44", "irr_data_coarse_b11.asset");
         SetTexture(material, "_45", "mask_b4.asset");
 
         // Screen-space captures are valid only for the captured camera. Reusing

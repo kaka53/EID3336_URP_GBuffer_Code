@@ -2,6 +2,11 @@ Shader "EID/URP/VS215849_PS215850_GBuffer"
 {
     Properties
     {
+        [Toggle] _EID3863WindEnabled ("实时风动（关闭还原捕获帧）", Float) = 0
+        _EID3863WindSpeed ("风动速度", Range(0,2)) = 0.25
+        _EID3863WindStrength ("风强度倍率", Range(0,3)) = 1
+        _EID3863WindDirection ("水平风向 XZ（使用 XY 分量）", Vector) = (0,1,0,0)
+
         [NoScaleOffset] _Res23 ("基础颜色贴图（RenderDoc PS资源23）", 2D) = "white" {}
         [NoScaleOffset] _Res25 ("法线与材质遮罩（RenderDoc PS资源25）", 2D) = "white" {}
         [NoScaleOffset] _EID3863VSRes34 ("顶点地形遮罩（VS资源34）", 2D) = "black" {}

@@ -157,15 +157,17 @@ cbuffer _11_12 : register(b7)
     float4 _12_m9[3] : packoffset(c9);
 };
 
-// RenderDoc EID5537 resource mapping:
-// _13=res14 depth, _14=res13 R11G11B10, _15=res17, _16=res16 mask, _17=res15 color.
+// Semantic bindings: current color, depth, packed motion, mask, and history color.
+// Do not infer texture semantics from SPIRV-Cross numeric identifiers.
 Texture2D<float4> _790 : register(t1);
 Texture2D<float4> _15  : register(t2);
 Texture2D<float4> _795 : register(t3);
 Texture2D<float4> _13  : register(t0);
 Texture2D<float4> _800 : register(t4);
-SamplerState __790_sampler : register(s0);
-SamplerState __795_sampler : register(s1);
+SamplerState sampler_790;
+SamplerState sampler_795;
+#define __790_sampler sampler_790
+#define __795_sampler sampler_795
 #define __800_sampler __795_sampler
 static float4 gl_FragCoord;
 static float4 _4;

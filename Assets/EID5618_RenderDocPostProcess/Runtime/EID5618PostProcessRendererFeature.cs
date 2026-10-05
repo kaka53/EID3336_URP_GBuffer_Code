@@ -179,11 +179,11 @@ sealed class EID5618PostProcessPass : ScriptableRenderPass
     static readonly int Res10Threshold = Shader.PropertyToID("_EID5618Res10Threshold");
     static readonly int B5 = Shader.PropertyToID("_13_14");
     static readonly int B6 = Shader.PropertyToID("_5_6");
-    static readonly int GeneratedRes14 = Shader.PropertyToID("_13");
-    static readonly int GeneratedRes13 = Shader.PropertyToID("_790");
-    static readonly int GeneratedRes17 = Shader.PropertyToID("_15");
+    static readonly int GeneratedRes14 = Shader.PropertyToID("_790");
+    static readonly int GeneratedRes13 = Shader.PropertyToID("_13");
+    static readonly int GeneratedRes17 = Shader.PropertyToID("_800");
     static readonly int GeneratedRes16 = Shader.PropertyToID("_795");
-    static readonly int GeneratedRes15 = Shader.PropertyToID("_800");
+    static readonly int GeneratedRes15 = Shader.PropertyToID("_15");
     static readonly int GeneratedB5 = Shader.PropertyToID("_11_12");
     static readonly int GeneratedB6 = Shader.PropertyToID("_5_6");
 
@@ -297,6 +297,10 @@ sealed class EID5618PostProcessPass : ScriptableRenderPass
                 res9Texture = ResolveCapturedTexture(profile != null ? profile.res9Captured : null,
                     "Assets/EID5618_RenderDocPostProcess/CapturedInputs/UnityNative/res9.asset",
                     "Assets/EID5618_RenderDocPostProcess/CapturedInputs/res9.png");
+            }
+            else if (sourceMode == EID5618InputProfile.Res9SourceMode.EID5537RenderFeature)
+            {
+                res9Texture = EID5537FixedFrameRendererFeature.CurrentOutput;
             }
             else if (sourceMode == EID5618InputProfile.Res9SourceMode.GeneratedEID5537 && generatedRes9Material != null)
             {

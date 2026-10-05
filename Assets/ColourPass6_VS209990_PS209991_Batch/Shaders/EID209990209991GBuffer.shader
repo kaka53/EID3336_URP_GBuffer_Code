@@ -31,6 +31,7 @@ Shader "EID/URP/VS209990_PS209991_GBuffer"
         _P22 ("c22 捕获局部参数", Vector) = (0,0,0,0)
         _SunDir ("uniforms33 child0 太阳方向", Vector) = (0,-0.57,-0.82,0)
         _EID209991MipBias ("uniforms20 全局纹理 Mip Bias", Float) = -1
+        _EID209965AlphaParams ("Depth alpha: angle offset, width, enabled", Vector) = (0,0,0,0)
         _AlphaCutoff ("透贴裁剪阈值", Range(0,1)) = 0.5
     }
     SubShader

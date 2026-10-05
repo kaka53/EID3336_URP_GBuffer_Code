@@ -486,7 +486,7 @@ public static class ColourPass6VS215847PS215848BatchImporter
             "- Layout variants: 1 (ec8a53eaa4a26539)\n" +
             "- Unique source meshes: 1\n" +
             "- Instances: 5 via uniforms27 stride 96, one MeshRenderer\n" +
-            "- Packed input1 on NORMAL.x oct 0.0020; live Unity VP; Combined wind RID14988/209141/210507; unique res25/res27; DXT5nm .wy; no clip; stencil 33; ZTest Equal; Queue Geometry\n\n");
+            "- Packed input1 on NORMAL.x oct 0.0020; live Unity VP; Combined wind RID14988/209141/210507; unique res25/res27; DXT5nm .wy; standalone res25 alpha clip (adjustable 0.5); stencil 33; ZTest LEqual (standalone depth write); Queue Geometry\n\n");
     }
 
     static string LayoutKey(Profile p) => string.Join("|", p.layout.Select(x => x.slot + ":" + x.offset + ":" + x.format.name));

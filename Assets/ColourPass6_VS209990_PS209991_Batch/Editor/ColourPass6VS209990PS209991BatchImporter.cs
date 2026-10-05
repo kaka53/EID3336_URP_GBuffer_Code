@@ -157,7 +157,7 @@ public static class ColourPass6VS209990PS209991BatchImporter
         int count = p.vertexCount;
         byte[] stream0 = new byte[count * 24];
         byte[] stream1 = new byte[count * 8];
-        byte[] stream2 = new byte[count * 8];
+        byte[] stream2 = new byte[count * 20];
 
         for (int v = 0; v < count; ++v)
         {
@@ -166,8 +166,9 @@ public static class ColourPass6VS209990PS209991BatchImporter
             Buffer.BlockCopy(pos, 0, stream0, v * 24, 12);
             Buffer.BlockCopy(packed, 0, stream0, v * 24 + 12, 4);
             CopyInput(p, "_input4", v, stream1, v * 8, 8);
-            CopyInput(p, "_input2", v, stream2, v * 8, 4);
-            CopyInput(p, "_input3", v, stream2, v * 8 + 4, 4);
+            // Unity orders Tangent before Color within a stream. Preserve FLOAT4 input3.
+            CopyInput(p, "_input3", v, stream2, v * 20, 16);
+            CopyInput(p, "_input2", v, stream2, v * 20 + 16, 4);
         }
 
         byte[] idxBytes = ReadFile(p.files.indices.file);
@@ -176,15 +177,15 @@ public static class ColourPass6VS209990PS209991BatchImporter
 
         string path = MeshPath(p.sharedGeometryFromEID != 0 ? p.sharedGeometryFromEID : p.eid);
         Mesh old = AssetDatabase.LoadAssetAtPath<Mesh>(path);
-        if (old != null) AssetDatabase.DeleteAsset(path);
-        var mesh = new Mesh { name = "EID" + (p.sharedGeometryFromEID != 0 ? p.sharedGeometryFromEID : p.eid) + " VS209990 Complete VSInput" };
+        if (old != null) old.Clear();
+        var mesh = old != null ? old : new Mesh { name = "EID" + (p.sharedGeometryFromEID != 0 ? p.sharedGeometryFromEID : p.eid) + " VS209990 Complete VSInput" };
         if (count > 65535) mesh.indexFormat = IndexFormat.UInt32;
         var desc = new[]
         {
             new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float32, 3, 0),
             new VertexAttributeDescriptor(VertexAttribute.Normal, VertexAttributeFormat.Float32, 3, 0),
             new VertexAttributeDescriptor(VertexAttribute.Color, VertexAttributeFormat.UNorm8, 4, 2),
-            new VertexAttributeDescriptor(VertexAttribute.Tangent, VertexAttributeFormat.UNorm8, 4, 2),
+            new VertexAttributeDescriptor(VertexAttribute.Tangent, VertexAttributeFormat.Float32, 4, 2),
             new VertexAttributeDescriptor(VertexAttribute.TexCoord0, VertexAttributeFormat.Float32, 2, 1),
         };
         mesh.SetVertexBufferParams(count, desc);
@@ -200,12 +201,13 @@ public static class ColourPass6VS209990PS209991BatchImporter
             vertexCount = count
         }, MeshUpdateFlags.DontRecalculateBounds | MeshUpdateFlags.DontValidateIndices);
         mesh.RecalculateBounds();
-        AssetDatabase.CreateAsset(mesh, path);
+        if (old == null) AssetDatabase.CreateAsset(mesh, path);
+        else EditorUtility.SetDirty(mesh);
 
         audit.AppendLine("## EID " + p.eid + " item " + p.meshItem);
         audit.AppendLine("- Vertices: `" + p.vertexCount + "`; Indices: `" + p.draw.indexCount + "`; Instances: `" + p.draw.instanceCount + "`");
         audit.AppendLine("- Shared geometry from EID: `" + p.sharedGeometryFromEID + "`");
-        audit.AppendLine("- Unity native streams: `Position Float32x3 + Normal Float32x3 packed _input1 in .x`, `UV0 Float32x2`, `input2/input3 UNorm8x4`");
+        audit.AppendLine("- Unity native streams: `Position Float32x3 + Normal Float32x3 packed _input1 in .x`, `UV0 Float32x2`, `input3 Tangent Float32x4 + input2 Color UNorm8x4`");
         audit.AppendLine("- Captured layout: `" + string.Join("; ", p.layout.Select(x => x.name + "=slot" + x.slot + "+" + x.offset + " " + x.format.name)) + "`");
         audit.AppendLine("- Captured skinning baked: `False`\n");
         return mesh;
@@ -229,6 +231,13 @@ public static class ColourPass6VS209990PS209991BatchImporter
             throw new FileNotFoundException("EID" + p.eid + " res28/res26 texture binding is incomplete.");
         m.SetTexture("_Res28", albedo);
         m.SetTexture("_Res26", normalTex);
+        // Matching depth draw EID1293 / PS209965, verified from endfield06.rdc.
+        // Keep the native DDS and its captured mip chain; a regenerated cutout PNG changes coverage.
+        if (p.eid == 3602)
+        {
+            m.SetFloat("_AlphaCutoff", 0.425f);
+            m.SetVector("_EID209965AlphaParams", new Vector4(0.3f, 0.5f, 1f, 0f));
+        }
         EditorUtility.SetDirty(m);
         report.AppendLine("EID" + p.eid + ": material res28=RID" + Rid(p, "res28") + " res26=RID" + Rid(p, "res26") + " PS uniforms31=" + local.Length + "B");
         return m;

@@ -3,8 +3,8 @@ Shader "EID/URP/VS209980_PS209981_GBuffer"
     Properties
     {
         [Header(RenderDoc Textures)]
-        _Res23 ("res23 基础颜色贴图 Binding3", 2D) = "white" {}
-        _Res25 ("res25 法线与材质贴图 Binding2", 2D) = "bump" {}
+        [NoScaleOffset] _Res23 ("res23 基础颜色贴图 Binding3", 2D) = "white" {}
+        [NoScaleOffset] _Res25 ("res25 法线与材质贴图 Binding2", 2D) = "bump" {}
         [Header(RenderDoc_PS_uniforms28_c00_c21)]
         _P00 ("c00 法线强度及粗糙度范围", Vector) = (1,0,0,1)
         _P01 ("c01 材质通道与双面法线控制", Vector) = (1,0,0,0)

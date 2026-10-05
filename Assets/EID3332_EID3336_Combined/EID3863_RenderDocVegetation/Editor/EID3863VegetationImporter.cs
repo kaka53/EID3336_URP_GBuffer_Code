@@ -66,6 +66,11 @@ public static class EID3863VegetationImporter
         Material material = AssetDatabase.LoadAssetAtPath<Material>(MaterialPath);
         if (material)
         {
+            // Preserve user wind controls when rebuilding captured assets.
+            foreach (string property in new[] { "_EID3863WindEnabled", "_EID3863WindSpeed", "_EID3863WindStrength" })
+                if (material.HasProperty(property)) generated.SetFloat(property, material.GetFloat(property));
+            if (material.HasProperty("_EID3863WindDirection"))
+                generated.SetVector("_EID3863WindDirection", material.GetVector("_EID3863WindDirection"));
             EditorUtility.CopySerialized(generated, material);
             UnityEngine.Object.DestroyImmediate(generated);
             EditorUtility.SetDirty(material);
@@ -236,6 +241,7 @@ public static class EID3863VegetationImporter
             maximumMatrixError = Mathf.Max(maximumMatrixError, MaximumMatrixDifference(capturedMatrix, instanceObject.transform.localToWorldMatrix));
         }
 
+        EID3863CaptureRepair.DisableDuplicateBatch(rootObject.scene);
         EditorUtility.SetDirty(rootObject);
         EditorSceneManager.MarkSceneDirty(rootObject.scene);
         EditorSceneManager.SaveScene(rootObject.scene);
