@@ -60,7 +60,8 @@ public sealed class EID4812ReplaySession : IDisposable
         uint exponent = bits >> mantissaBits, mantissa = bits & mantissaMask;
         if (exponent == 0) return (float)(mantissa * Math.Pow(2.0, 1 - 15 - mantissaBits));
         if (exponent == 31) return mantissa == 0 ? float.PositiveInfinity : float.NaN;
-        return (float)((1.0 + mantissa / (double)(1u << mantissaBits)) * Math.Pow(2.0, exponent - 15));
+        // Cast before subtraction: exponent is uint and would underflow for exponents below the bias.
+        return (float)((1.0 + mantissa / (double)(1u << mantissaBits)) * Math.Pow(2.0, (int)exponent - 15));
     }
     T Own<T>(T x) where T:UnityEngine.Object{x.hideFlags=HideFlags.HideAndDontSave;objects.Add(x);return x;}
     

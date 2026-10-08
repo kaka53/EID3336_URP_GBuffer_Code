@@ -33,6 +33,12 @@ Shader "Hidden/EID4812/CharacterForward"
    Stencil { Ref 52 Comp GEqual Pass Replace ReadMask 16 WriteMask 239 }
    HLSLPROGRAM
    #pragma target 5.0
+   // EID4812's GBuffer pass is intentionally disabled on the material. It is
+   // retained for the Vulkan capture path, but compiling the five-MRT pass for
+   // D3D11 creates invalid shader variants during editor import and can leave
+   // the forward material with an error variant. The shared EID1727 GBuffer is
+   // the depth/GBuffer producer for the D3D11 forward path.
+   #pragma only_renderers vulkan
    #pragma exclude_renderers gles gles3 glcore
    #pragma vertex EID4812GBufferVertex
    #pragma fragment EID4812GBufferFragment
@@ -48,7 +54,9 @@ Shader "Hidden/EID4812/CharacterForward"
    ColorMask RGBA
    HLSLPROGRAM
    #pragma target 5.0
+   #if defined(SHADER_API_VULKAN)
    #pragma use_dxc
+   #endif
    #pragma only_renderers d3d11 vulkan
    #pragma exclude_renderers gles gles3 glcore
    #pragma vertex EID4812Vertex
@@ -70,7 +78,7 @@ struct EID4812Input
  float3 input5 : TEXCOORD5;
  float4 bakedTangent : TEXCOORD6;
  float3 rawInput0 : TEXCOORD7;
- float4 input8 : BLENDWEIGHT;
+ float4 input8 : BLENDWEIGHTS;
  uint4 input9 : BLENDINDICES;
 };
 VS_SPIRV_Cross_Output EID4812Vertex(EID4812Input v)

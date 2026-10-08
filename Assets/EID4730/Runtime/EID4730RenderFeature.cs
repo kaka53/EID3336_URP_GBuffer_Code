@@ -161,6 +161,7 @@ namespace EID4730
             RTHandle colorTarget;
             RTHandle depthTarget;
             RTHandle sharedCharacterAuxiliary;
+            RTHandle ownedCharacterAuxiliary;
             public RTHandle SharedAuxiliary => sharedCharacterAuxiliary;
             // Allocated only by explicit editor diagnostics; never used by normal rendering.
             RTHandle eid4725Auxiliary;
@@ -237,8 +238,9 @@ namespace EID4730
                 var sharedDesc = renderingData.cameraData.cameraTargetDescriptor;
                 sharedDesc.depthBufferBits = 0;
                 sharedDesc.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.A2B10G10R10_UNormPack32;
-                RenderingUtils.ReAllocateIfNeeded(ref sharedCharacterAuxiliary, sharedDesc,
+                RenderingUtils.ReAllocateIfNeeded(ref ownedCharacterAuxiliary, sharedDesc,
                     FilterMode.Point, TextureWrapMode.Clamp, name: "_CharacterForward_AuxiliaryMRT");
+                sharedCharacterAuxiliary = ownedCharacterAuxiliary;
                 if (IsolatedAttachmentDiagnostics)
                 {
                     if (owner.enableEID4812CharacterForward)
@@ -349,6 +351,12 @@ namespace EID4730
                     cmd.SetGlobalVector("_WorldSpaceCameraPos", cameraData.worldSpaceCameraPos);
                     color = colorTarget != null ? colorTarget : cameraData.renderer.cameraColorTargetHandle;
                     depth = depthTarget != null ? depthTarget : cameraData.renderer.cameraDepthTargetHandle;
+                    RTHandle liveMotion = null;
+                    bool sharedMotion = color?.rt != null && !IsolatedAttachmentDiagnostics && cameraData.camera.cameraType == CameraType.Game &&
+                        EID3336FiveMRTLightingInputs.TryGetMotion(cameraData.camera, out liveMotion) &&
+                        liveMotion.rt.width == color.rt.width && liveMotion.rt.height == color.rt.height &&
+                        liveMotion.rt.antiAliasing == color.rt.antiAliasing;
+                    if (sharedMotion) sharedCharacterAuxiliary = liveMotion;
                     if (color == null || depth == null || sharedCharacterAuxiliary == null) return;
                     restoreTargets = true;
                     if (IsolatedAttachmentDiagnostics)
@@ -360,8 +368,11 @@ namespace EID4730
                         // to this feature: initialize our owned auxiliary ONCE per camera.
                         // Never clear camera color, depth or stencil.
                         cmd.BeginSample("Character MRT / Initialize auxiliary once");
-                        cmd.SetRenderTarget(sharedCharacterAuxiliary);
-                        cmd.ClearRenderTarget(false, true, Color.clear);
+                        // Borrow GBuffer RT1 and preserve opaque motion. Only clear our fallback.
+                        if (!sharedMotion) {
+                            cmd.SetRenderTarget(sharedCharacterAuxiliary);
+                            cmd.ClearRenderTarget(false, true, Color.clear);
+                        }
                         cmd.SetRenderTarget(new RenderTargetIdentifier[] { color.nameID, sharedCharacterAuxiliary.nameID }, depth.nameID);
                         cmd.SetGlobalTexture("_CharacterForward_AuxiliaryMRT", sharedCharacterAuxiliary.nameID);
                         // Old names mean isolated masks, NOT aliases of the accumulated MRT.
@@ -376,8 +387,8 @@ namespace EID4730
                         cmd.SetGlobalTexture("_EID4883_AuxiliaryMRT", Texture2D.blackTexture);
                         cmd.EndSample("Character MRT / Initialize auxiliary once");
 #if UNITY_EDITOR
-                        LastAuxiliaryClearCount++;
-                        LastTargetBindingCount += 2;
+                        if (!sharedMotion) LastAuxiliaryClearCount++;
+                        LastTargetBindingCount += sharedMotion ? 1 : 2;
 #endif
                     }
                     context.ExecuteCommandBuffer(cmd);
@@ -833,7 +844,8 @@ namespace EID4730
             {
                 colorTarget = null;
                 depthTarget = null;
-                sharedCharacterAuxiliary?.Release();
+                ownedCharacterAuxiliary?.Release();
+                ownedCharacterAuxiliary = null;
                 sharedCharacterAuxiliary = null;
                 eid4725Auxiliary?.Release();
                 eid4725Auxiliary = null;

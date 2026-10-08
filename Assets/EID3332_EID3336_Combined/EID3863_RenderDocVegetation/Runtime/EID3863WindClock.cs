@@ -14,6 +14,20 @@ public static class EID3863WindClock
     static bool runtimeDomain;
 #if UNITY_EDITOR
     static double nextRepaint;
+    const string PreviewKey = "EID3863.WindPreview.Enabled";
+    const string PreviewMenu = "EID3332-EID3336/EID3863/Enable Editor Wind Preview";
+    [MenuItem(PreviewMenu)]
+    static void ToggleEditorPreview()
+    {
+        SessionState.SetBool(PreviewKey, !SessionState.GetBool(PreviewKey, false));
+        Reset();
+    }
+    [MenuItem(PreviewMenu, true)]
+    static bool ValidateEditorPreview()
+    {
+        Menu.SetChecked(PreviewMenu, SessionState.GetBool(PreviewKey, false));
+        return true;
+    }
     static readonly string[] MaterialPaths = new[] {
         "Assets/EID3332_EID3336_Combined/EID3863_RenderDocVegetation/Materials/EID3863_Vegetation_PS215850.mat",
         "Assets/ColourPass6_VS215849_PS215850_Batch/Materials/EID3875_VS215849_PS215850.mat",
@@ -32,6 +46,9 @@ public static class EID3863WindClock
     static void EditorTick()
     {
         if (Application.isPlaying || EditorApplication.isCompiling || EditorApplication.isUpdating) return;
+        // Do not force both viewports to render continuously during startup.
+        // Runtime wind is unaffected; editor animation is opt-in per session.
+        if (!SessionState.GetBool(PreviewKey, false)) return;
         double now = EditorApplication.timeSinceStartup;
         if (now < nextRepaint) return;
         nextRepaint = now + 1.0 / 15.0;

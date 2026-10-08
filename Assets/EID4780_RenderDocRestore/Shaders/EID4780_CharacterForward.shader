@@ -56,7 +56,9 @@ Shader "Hidden/EID4780/CharacterForward"
    Cull Back ZTest Equal ZWrite On Blend Off
    HLSLPROGRAM
    #pragma target 5.0
+   #if defined(SHADER_API_VULKAN)
    #pragma use_dxc
+   #endif
    #pragma only_renderers d3d11 vulkan
    #pragma exclude_renderers gles gles3 glcore
    #pragma vertex EID4780Vertex
@@ -77,7 +79,7 @@ struct EID4780Input
  float3 input5 : TEXCOORD5;
  float4 bakedTangent : TEXCOORD6;
  float3 rawInput0 : TEXCOORD7;
- float4 input8 : BLENDWEIGHT;
+ float4 input8 : BLENDWEIGHTS;
  uint4 input9 : BLENDINDICES;
 };
 VS_SPIRV_Cross_Output EID4780Vertex(EID4780Input v)
@@ -107,7 +109,9 @@ EID4780FragmentOutput EID4780Fragment(VS_SPIRV_Cross_Output i,bool isFrontFace:S
    Stencil { Ref 36 Comp Always Pass Replace ReadMask 255 WriteMask 255 }
    HLSLPROGRAM
    #pragma target 5.0
+   #if defined(SHADER_API_VULKAN)
    #pragma use_dxc
+   #endif
    #pragma only_renderers d3d11 vulkan
    #pragma exclude_renderers gles gles3 glcore
    #pragma vertex EID215445Vertex

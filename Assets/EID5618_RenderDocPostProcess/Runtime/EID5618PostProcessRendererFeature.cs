@@ -62,13 +62,25 @@ public sealed class EID5618PostProcessRendererFeature : ScriptableRendererFeatur
     Material runtimeMaterial;
     Material copyMaterial;
     Material generatedRes9Material;
+    bool ownsRuntimeMaterial;
+    Settings passSettings;
+    Material passMaterial, passCopyMaterial, passGeneratedMaterial;
 
     public override void Create()
     {
         EnsureMaterial();
         EnsureCopyMaterial();
         EnsureGeneratedRes9Material();
-        pass = new EID5618PostProcessPass(settings, runtimeMaterial, copyMaterial, generatedRes9Material);
+        if (pass == null || !ReferenceEquals(passSettings, settings) || passMaterial != runtimeMaterial ||
+            passCopyMaterial != copyMaterial || passGeneratedMaterial != generatedRes9Material)
+        {
+            pass?.Dispose();
+            pass = new EID5618PostProcessPass(settings, runtimeMaterial, copyMaterial, generatedRes9Material);
+            passSettings = settings;
+            passMaterial = runtimeMaterial;
+            passCopyMaterial = copyMaterial;
+            passGeneratedMaterial = generatedRes9Material;
+        }
         pass.renderPassEvent = settings.injectionPoint;
     }
 
@@ -80,18 +92,32 @@ public sealed class EID5618PostProcessRendererFeature : ScriptableRendererFeatur
             Debug.LogError("[EID5618] Copy shader was not found.");
             return;
         }
+        if (copyMaterial != null && copyMaterial.shader == shader) return;
+        if (copyMaterial != null) CoreUtils.Destroy(copyMaterial);
         copyMaterial = CoreUtils.CreateEngineMaterial(shader);
         copyMaterial.name = "EID5618_InputCopy_Runtime";
     }
 
     void EnsureGeneratedRes9Material()
     {
+        // TAA is optional. Live camera colour must not instantiate its shader
+        // when the standalone EID5537 feature is disabled.
+        if (settings.inputProfile == null ||
+            settings.inputProfile.res9Source != EID5618InputProfile.Res9SourceMode.GeneratedEID5537)
+        {
+            if (generatedRes9Material != null) CoreUtils.Destroy(generatedRes9Material);
+            generatedRes9Material = null;
+            return;
+        }
+
         Shader shader = Shader.Find("Hidden/EID5618/EID5537Res9");
         if (shader == null)
         {
             Debug.LogWarning("[EID5618] Generated EID5537 shader was not found; GeneratedEID5537 mode will fall back to captured res9.");
             return;
         }
+        if (generatedRes9Material != null && generatedRes9Material.shader == shader) return;
+        if (generatedRes9Material != null) CoreUtils.Destroy(generatedRes9Material);
         generatedRes9Material = CoreUtils.CreateEngineMaterial(shader);
         generatedRes9Material.name = "EID5537_Res9_Runtime";
     }
@@ -109,11 +135,16 @@ public sealed class EID5618PostProcessRendererFeature : ScriptableRendererFeatur
         // intentionally kept in the project for comparison only.
         if (settings.material != null && settings.material.shader == exact)
         {
+            if (ownsRuntimeMaterial && runtimeMaterial != null) CoreUtils.Destroy(runtimeMaterial);
             runtimeMaterial = settings.material;
+            ownsRuntimeMaterial = false;
             return;
         }
 
+        if (ownsRuntimeMaterial && runtimeMaterial != null && runtimeMaterial.shader == exact) return;
+        if (ownsRuntimeMaterial && runtimeMaterial != null) CoreUtils.Destroy(runtimeMaterial);
         runtimeMaterial = CoreUtils.CreateEngineMaterial(exact);
+        ownsRuntimeMaterial = true;
         runtimeMaterial.name = "EID5618_ExactRenderDoc_Runtime";
     }
 
@@ -121,7 +152,7 @@ public sealed class EID5618PostProcessRendererFeature : ScriptableRendererFeatur
     {
         pass?.Dispose();
         pass = null;
-        if (runtimeMaterial != null && runtimeMaterial != settings.material)
+        if (runtimeMaterial != null && ownsRuntimeMaterial)
             CoreUtils.Destroy(runtimeMaterial);
         if (copyMaterial != null)
             CoreUtils.Destroy(copyMaterial);
@@ -130,6 +161,9 @@ public sealed class EID5618PostProcessRendererFeature : ScriptableRendererFeatur
         runtimeMaterial = null;
         copyMaterial = null;
         generatedRes9Material = null;
+        ownsRuntimeMaterial = false;
+        passSettings = null;
+        passMaterial = passCopyMaterial = passGeneratedMaterial = null;
     }
 
     public override void SetupRenderPasses(ScriptableRenderer renderer, in RenderingData renderingData)
@@ -210,6 +244,7 @@ sealed class EID5618PostProcessPass : ScriptableRenderPass
     int targetHeight;
     bool warnedMissing;
     bool loggedBindings;
+    RenderTextureDescriptor liveDescriptor;
 
     public EID5618PostProcessPass(EID5618PostProcessRendererFeature.Settings settings, Material material, Material copyMaterial, Material generatedRes9Material)
     {
@@ -251,8 +286,9 @@ sealed class EID5618PostProcessPass : ScriptableRenderPass
             sRGB = false,
             graphicsFormat = GraphicsFormat.R8G8B8A8_UNorm
         };
-        RenderingUtils.ReAllocateIfNeeded(ref exactTarget, exact, FilterMode.Point,
-            TextureWrapMode.Clamp, name: "EID5618_Exact_R8G8B8A8_UNORM");
+        if (exactTarget?.rt == null || !exactTarget.rt.IsCreated() || !exactTarget.rt.descriptor.Equals(exact))
+            RenderingUtils.ReAllocateIfNeeded(ref exactTarget, exact, FilterMode.Point,
+                TextureWrapMode.Clamp, name: "EID5618_Exact_R8G8B8A8_UNORM");
 
         RenderTextureDescriptor liveDesc = cameraDesc;
         liveDesc.width = targetWidth;
@@ -265,8 +301,9 @@ sealed class EID5618PostProcessPass : ScriptableRenderPass
         liveDesc.sRGB = false;
         liveDesc.useDynamicScale = false;
         liveDesc.graphicsFormat = GraphicsFormat.R16G16B16A16_SFloat;
-        RenderingUtils.ReAllocateIfNeeded(ref liveFullColor, liveDesc, FilterMode.Point,
-            TextureWrapMode.Clamp, name: "EID5618_LiveOrGenerated_Res9");
+        liveDescriptor = liveDesc;
+        if (live || (profile != null && profile.res9Source == EID5618InputProfile.Res9SourceMode.GeneratedEID5537))
+            EnsureLiveColorTarget();
 
         ConfigureTarget(cameraColor);
         ConfigureClear(ClearFlag.None, Color.clear);
@@ -274,7 +311,7 @@ sealed class EID5618PostProcessPass : ScriptableRenderPass
 
     public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
     {
-        if (cameraColor == null || exactTarget == null || liveFullColor == null || material == null)
+        if (cameraColor == null || exactTarget == null || material == null)
             return;
 
         EID5618InputProfile profile = settings.inputProfile;
@@ -300,7 +337,14 @@ sealed class EID5618PostProcessPass : ScriptableRenderPass
             }
             else if (sourceMode == EID5618InputProfile.Res9SourceMode.EID5537RenderFeature)
             {
-                res9Texture = EID5537FixedFrameRendererFeature.CurrentOutput;
+                // EID5537 owns one fixed RT shared by the renderer feature asset.
+                // Require the output to belong to this camera; otherwise a second
+                // camera could sample the previous camera's frame or a released RT.
+                res9Texture = EID5537FixedFrameRendererFeature.GetCurrentOutput(
+                    renderingData.cameraData.camera);
+                // SceneView and ineligible/failed TAA cameras remain live, never
+                // sample another camera's history or leave the display blank.
+                if (res9Texture == null) res9Texture = CopyLiveCamera(cmd, profile);
             }
             else if (sourceMode == EID5618InputProfile.Res9SourceMode.GeneratedEID5537 && generatedRes9Material != null)
             {
@@ -344,16 +388,7 @@ sealed class EID5618PostProcessPass : ScriptableRenderPass
             {
                 // Explicit live diagnostic fallback only.
 
-                if (cameraColor.rt == null || liveFullColor.rt == null)
-                    return;
-                copyMaterial.SetTexture(CopySource, cameraColor.rt);
-                copyMaterial.SetFloat(LiveCameraFlipY, profile != null && profile.flipLiveCameraY ? 1.0f : 0.0f);
-                CoreUtils.SetRenderTarget(cmd, liveFullColor, ClearFlag.None, Color.clear);
-                // Do not inherit a viewport left by an earlier URP pass.
-                // CopyColor is a 1:1 full-resolution input copy.
-                cmd.SetViewport(new Rect(0f, 0f, targetWidth, targetHeight));
-                cmd.DrawProcedural(Matrix4x4.identity, copyMaterial, 0, MeshTopology.Triangles, 3, 1);
-                res9Texture = liveFullColor.rt;
+                res9Texture = CopyLiveCamera(cmd, profile);
             }
 
             if (res9Texture == null)
@@ -470,6 +505,26 @@ sealed class EID5618PostProcessPass : ScriptableRenderPass
 #else
         return null;
 #endif
+    }
+
+    void EnsureLiveColorTarget()
+    {
+        if (liveFullColor?.rt != null && liveFullColor.rt.IsCreated() && liveFullColor.rt.descriptor.Equals(liveDescriptor)) return;
+        RenderingUtils.ReAllocateIfNeeded(ref liveFullColor, liveDescriptor, FilterMode.Point,
+            TextureWrapMode.Clamp, name: "EID5618_LiveOrGenerated_Res9");
+    }
+
+    Texture CopyLiveCamera(CommandBuffer cmd, EID5618InputProfile profile)
+    {
+        if (copyMaterial == null || cameraColor?.rt == null) return null;
+        EnsureLiveColorTarget();
+        if (liveFullColor?.rt == null) return null;
+        copyMaterial.SetTexture(CopySource, cameraColor.rt);
+        copyMaterial.SetFloat(LiveCameraFlipY, profile != null && profile.flipLiveCameraY ? 1f : 0f);
+        CoreUtils.SetRenderTarget(cmd, liveFullColor, ClearFlag.None, Color.clear);
+        cmd.SetViewport(new Rect(0f, 0f, targetWidth, targetHeight));
+        cmd.DrawProcedural(Matrix4x4.identity, copyMaterial, 0, MeshTopology.Triangles, 3, 1);
+        return liveFullColor.rt;
     }
 
     bool EnsureConstantBuffers(EID5618InputProfile profile, int width, int height)

@@ -12,7 +12,11 @@ struct VS_30
     float4 _m9;
 };
 
+#if defined(SHADER_API_D3D11)
+cbuffer VS_25_26
+#else
 cbuffer VS_25_26 : register(b43)
+#endif
 {
     column_major float4x4 VS_26_m0 : packoffset(c0);
     column_major float4x4 VS_26_m1 : packoffset(c4);
@@ -38,7 +42,11 @@ cbuffer VS_25_26 : register(b43)
     float4 VS_26_m21 : packoffset(c81);
 };
 
+#if defined(SHADER_API_D3D11)
+cbuffer VS_27_28
+#else
 cbuffer VS_27_28 : register(b44)
+#endif
 {
     float4 VS_28_m0 : packoffset(c0);
     float4 VS_28_m1 : packoffset(c1);
@@ -181,13 +189,43 @@ cbuffer VS_27_28 : register(b44)
     float4 VS_28_m138[32] : packoffset(c168);
 };
 
+#if defined(SHADER_API_D3D11)
+cbuffer VS_29_31
+#else
 cbuffer VS_29_31 : register(b40)
+#endif
 {
+#if defined(SHADER_API_D3D11)
+    float4 VS_31_m0_Packed[4096] : packoffset(c0);
+#else
     VS_30 VS_31_m0[256] : packoffset(c0);
+#endif
 };
+VS_30 EID4812_VSInstance(uint i) {
+#if defined(SHADER_API_D3D11)
+    uint b=i*16u; VS_30 r;
+    r._m0=transpose(float4x4(VS_31_m0_Packed[b],VS_31_m0_Packed[b+1],VS_31_m0_Packed[b+2],VS_31_m0_Packed[b+3]));
+    r._m1=VS_31_m0_Packed[b+4]; r._m2=VS_31_m0_Packed[b+5];
+    r._m3=transpose(float4x4(VS_31_m0_Packed[b+6],VS_31_m0_Packed[b+7],VS_31_m0_Packed[b+8],VS_31_m0_Packed[b+9]));
+    r._m4=VS_31_m0_Packed[b+10];
+    r._m5=VS_31_m0_Packed[b+11];
+    r._m6=VS_31_m0_Packed[b+12];
+    r._m7=VS_31_m0_Packed[b+13];
+    r._m8=VS_31_m0_Packed[b+14];
+    r._m9=VS_31_m0_Packed[b+15];
+    return r;
+#else
+    return VS_31_m0[i];
+#endif
+}
+
 
 ByteAddressBuffer VS_33 : register(t60);
+#if defined(SHADER_API_D3D11)
+cbuffer VS_34_35
+#else
 cbuffer VS_34_35 : register(b41)
+#endif
 {
     float VS_35_m0 : packoffset(c0);
     float VS_35_m1 : packoffset(c0.y);
@@ -398,7 +436,7 @@ void vert_main()
     }
     bool4 VS_287 = VS_212.xxxx;
     float4 VS_288 = float4(VS_287.x ? VS_286.x : VS_10.x, VS_287.y ? VS_286.y : VS_10.y, VS_287.z ? VS_286.z : VS_10.z, VS_287.w ? VS_286.w : VS_10.w);
-    uint VS_291 = asuint(VS_31_m0[uint(gl_InstanceIndex)]._m1.w);
+    uint VS_291 = asuint(EID4812_VSInstance(uint(gl_InstanceIndex))._m1.w);
     // Position/normal/tangent are already baked from the capture-time skin buffer, as in EID1727.
     if (_EIDBakedCapturedSkinning != 0u) VS_291 &= 4294967263u; // clear skin-enable bit 32, preserve bit 16 and influence count
     bool VS_293 = (VS_291 & 16u) != 0u;
@@ -421,8 +459,8 @@ void vert_main()
             break;
         }
         uint4 VS_321 = VS_13 * uint4(3u, 3u, 3u, 3u);
-        uint4 VS_322 = (asuint(VS_31_m0[uint(gl_InstanceIndex)]._m2.x) + 3u).xxxx + VS_321;
-        uint4 VS_324 = (asuint(VS_31_m0[uint(gl_InstanceIndex)]._m2.y) + 3u).xxxx + VS_321;
+        uint4 VS_322 = (asuint(EID4812_VSInstance(uint(gl_InstanceIndex))._m2.x) + 3u).xxxx + VS_321;
+        uint4 VS_324 = (asuint(EID4812_VSInstance(uint(gl_InstanceIndex))._m2.y) + 3u).xxxx + VS_321;
         uint VS_325 = VS_322.x;
         uint VS_328 = VS_325 + 1u;
         uint VS_331 = VS_325 + 2u;
@@ -515,13 +553,13 @@ void vert_main()
     float VS_528 = dot(VS_527, VS_527);
     float3 VS_533 = mul(VS_494, VS_482.xyz);
     float VS_534 = dot(VS_533, VS_533);
-    bool3 VS_547 = (VS_31_m0[uint(gl_InstanceIndex)]._m4.x < 1.0f).xxx;
+    bool3 VS_547 = (EID4812_VSInstance(uint(gl_InstanceIndex))._m4.x < 1.0f).xxx;
     VS_14 = (VS_4 * VS_35_m28.xy) + VS_35_m28.zw;
     VS_15 = VS_504;
     VS_16 = VS_527 * rsqrt(isnan(VS_528) ? 1.1754943508222875079687365372222e-38f : (isnan(1.1754943508222875079687365372222e-38f) ? VS_528 : max(1.1754943508222875079687365372222e-38f, VS_528)));
     VS_17 = float4(VS_533 * rsqrt(isnan(VS_534) ? 1.1754943508222875079687365372222e-38f : (isnan(1.1754943508222875079687365372222e-38f) ? VS_534 : max(1.1754943508222875079687365372222e-38f, VS_534))), VS_482.w);
     VS_18 = VS_511.xyw;
-    VS_19 = mul(VS_26_m15, float4(mul(float3x3(VS_31_m0[uint(gl_InstanceIndex)]._m3[0].xyz, VS_31_m0[uint(gl_InstanceIndex)]._m3[1].xyz, VS_31_m0[uint(gl_InstanceIndex)]._m3[2].xyz), float3(VS_547.x ? VS_484.x : VS_485.xyz.x, VS_547.y ? VS_484.y : VS_485.xyz.y, VS_547.z ? VS_484.z : VS_485.xyz.z)) + (float3(VS_31_m0[uint(gl_InstanceIndex)]._m3[0].w, VS_31_m0[uint(gl_InstanceIndex)]._m3[1].w, VS_31_m0[uint(gl_InstanceIndex)]._m3[2].w) - VS_26_m21.xyz), 1.0f)).xyw;
+    VS_19 = mul(VS_26_m15, float4(mul(float3x3(EID4812_VSInstance(uint(gl_InstanceIndex))._m3[0].xyz, EID4812_VSInstance(uint(gl_InstanceIndex))._m3[1].xyz, EID4812_VSInstance(uint(gl_InstanceIndex))._m3[2].xyz), float3(VS_547.x ? VS_484.x : VS_485.xyz.x, VS_547.y ? VS_484.y : VS_485.xyz.y, VS_547.z ? VS_484.z : VS_485.xyz.z)) + (float3(EID4812_VSInstance(uint(gl_InstanceIndex))._m3[0].w, EID4812_VSInstance(uint(gl_InstanceIndex))._m3[1].w, EID4812_VSInstance(uint(gl_InstanceIndex))._m3[2].w) - VS_26_m21.xyz), 1.0f)).xyw;
     VS_20 = float3(VS_294.x ? VS_285.x : VS_205.x, VS_294.y ? VS_285.y : VS_205.y, VS_294.z ? VS_285.z : VS_205.z);
     VS_21 = float4(VS_296.x ? VS_288.x : VS_208.x, VS_296.y ? VS_288.y : VS_208.y, VS_296.z ? VS_288.z : VS_208.z, VS_296.w ? VS_288.w : VS_208.w);
     VS_22 = VS_8;

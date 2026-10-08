@@ -51,10 +51,17 @@ public static class EID5537FixedFrameSetup
         }
         feature.settings.profile = profile;
         feature.settings.shader = Require<Shader>(Base + "Shaders/EID5537Res9.shader");
-        feature.settings.injectionPoint = RenderPassEvent.AfterRenderingPostProcessing;
+        // EID5618 consumes the generated res9 at AfterRenderingPostProcessing.
+        // Produce it earlier so the dependency is independent of feature-list order.
+        feature.settings.injectionPoint = RenderPassEvent.BeforeRenderingPostProcessing;
         feature.settings.renderInGameView = true;
         feature.settings.renderInSceneView = false;
         feature.settings.enabledForCamera = true;
+        feature.settings.allowEditMode = false;
+        feature.settings.requireGameCamera = true;
+        feature.settings.cameraNameContains = "EID3336 RenderDoc Camera";
+        feature.settings.skipOverlayCameras = true;
+        feature.settings.skipStereoCameras = true;
         EditorUtility.SetDirty(feature);
         EditorUtility.SetDirty(renderer);
         typeof(ScriptableRendererData).GetMethod("ValidateRendererFeatures", BindingFlags.Instance | BindingFlags.NonPublic)

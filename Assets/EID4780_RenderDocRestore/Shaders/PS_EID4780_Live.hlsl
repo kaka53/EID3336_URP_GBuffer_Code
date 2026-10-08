@@ -17,7 +17,11 @@ struct _22
 static const int2 _361[6] = { int2(2, 1), int2(2, 1), int2(0, 2), int2(0, 2), int2(0, 1), int2(0, 1) };
 static const float2 _362[6] = { float2(-1.0f, 1.0f), 1.0f.xx, float2(1.0f, -1.0f), 1.0f.xx, 1.0f.xx, float2(-1.0f, 1.0f) };
 
+#if defined(SHADER_API_D3D11)
+cbuffer _17_18
+#else
 cbuffer _17_18 : register(b12)
+#endif
 {
     column_major float4x4 _18_m0 : packoffset(c0);
     column_major float4x4 _18_m1 : packoffset(c4);
@@ -43,7 +47,11 @@ cbuffer _17_18 : register(b12)
     float4 _18_m21 : packoffset(c81);
 };
 
+#if defined(SHADER_API_D3D11)
+cbuffer _19_20
+#else
 cbuffer _19_20 : register(b16)
+#endif
 {
     float4 _20_m0 : packoffset(c0);
     float4 _20_m1 : packoffset(c1);
@@ -186,14 +194,44 @@ cbuffer _19_20 : register(b16)
     float4 _20_m138[32] : packoffset(c168);
 };
 
+#if defined(SHADER_API_D3D11)
+cbuffer _21_23
+#else
 cbuffer _21_23 : register(b0)
+#endif
 {
+#if defined(SHADER_API_D3D11)
+    float4 _23_m0_Packed[4096] : packoffset(c0);
+#else
     _22 _23_m0[256] : packoffset(c0);
+#endif
 };
+_22 EID4780_PSInstance(uint i) {
+#if defined(SHADER_API_D3D11)
+ uint b=i*16u; _22 r;
+ r._m0=transpose(float4x4(_23_m0_Packed[b],_23_m0_Packed[b+1],_23_m0_Packed[b+2],_23_m0_Packed[b+3]));
+ r._m1=_23_m0_Packed[b+4];r._m2=_23_m0_Packed[b+5];
+ r._m3=transpose(float4x4(_23_m0_Packed[b+6],_23_m0_Packed[b+7],_23_m0_Packed[b+8],_23_m0_Packed[b+9]));
+r._m4=_23_m0_Packed[b+10];
+r._m5=_23_m0_Packed[b+11];
+r._m6=_23_m0_Packed[b+12];
+r._m7=_23_m0_Packed[b+13];
+r._m8=_23_m0_Packed[b+14];
+r._m9=_23_m0_Packed[b+15];
+return r;
+#else
+return _23_m0[i];
+#endif
+}
+
 
 ByteAddressBuffer _31 : register(t51);
 ByteAddressBuffer _33 : register(t18);
+#if defined(SHADER_API_D3D11)
+cbuffer _34_35
+#else
 cbuffer _34_35 : register(b48)
+#endif
 {
     int _35_m0 : packoffset(c0);
     int _35_m1 : packoffset(c0.y);
@@ -209,7 +247,11 @@ cbuffer _34_35 : register(b48)
     float _35_m11 : packoffset(c2.w);
 };
 
+#if defined(SHADER_API_D3D11)
+cbuffer _36_37
+#else
 cbuffer _36_37 : register(b14)
+#endif
 {
     float4 _37_m0 : packoffset(c0);
     float4 _37_m1 : packoffset(c1);
@@ -220,7 +262,11 @@ cbuffer _36_37 : register(b14)
     float4 _37_m6[2048] : packoffset(c6);
 };
 
+#if defined(SHADER_API_D3D11)
+cbuffer _38_39
+#else
 cbuffer _38_39 : register(b15)
+#endif
 {
     column_major float4x4 _39_m0[5] : packoffset(c0);
     float4 _39_m1[4] : packoffset(c20);
@@ -252,7 +298,11 @@ cbuffer _38_39 : register(b15)
     float4 _39_m27[128] : packoffset(c587);
 };
 
+#if defined(SHADER_API_D3D11)
+cbuffer _49_50
+#else
 cbuffer _49_50 : register(b42)
+#endif
 {
     float _50_m0 : packoffset(c0);
     float _50_m1 : packoffset(c0.y);
@@ -309,7 +359,11 @@ cbuffer _49_50 : register(b42)
     float _50_m52 : packoffset(c22.w);
 };
 
+#if defined(SHADER_API_D3D11)
+cbuffer _57_58
+#else
 cbuffer _57_58 : register(b50)
+#endif
 {
     float4 _58_m0[32] : packoffset(c0);
     column_major float4x4 _58_m1[32] : packoffset(c32);
@@ -388,6 +442,42 @@ float2 spvUnpackHalf2x16(uint value)
     return f16tof32(uint2(value & 0xffff, value >> 16));
 }
 
+// FXC SM5 workaround: the intrinsic NaN lowering in this dynamic light loop
+// forces unrolling. Test IEEE-754 exponent/mantissa bits instead, preserving
+// all finite, infinity and NaN cases. Keep Vulkan's original intrinsic.
+bool EID4780_IsNaN(float v)
+{
+#if defined(SHADER_API_D3D11)
+    return (asuint(v) & 0x7fffffffu) > 0x7f800000u;
+#else
+    return isnan(v);
+#endif
+}
+bool2 EID4780_IsNaN(float2 v)
+{
+#if defined(SHADER_API_D3D11)
+    return (asuint(v) & 0x7fffffffu) > 0x7f800000u;
+#else
+    return isnan(v);
+#endif
+}
+bool3 EID4780_IsNaN(float3 v)
+{
+#if defined(SHADER_API_D3D11)
+    return (asuint(v) & 0x7fffffffu) > 0x7f800000u;
+#else
+    return isnan(v);
+#endif
+}
+bool4 EID4780_IsNaN(float4 v)
+{
+#if defined(SHADER_API_D3D11)
+    return (asuint(v) & 0x7fffffffu) > 0x7f800000u;
+#else
+    return isnan(v);
+#endif
+}
+
 void frag_main()
 {
     // Captured light-grid and fog depth use the original camera clip W.
@@ -397,8 +487,8 @@ void frag_main()
     float _428 = rsqrt(isnan(9.9999999392252902907785028219223e-09f) ? _426 : (isnan(_426) ? 9.9999999392252902907785028219223e-09f : max(_426, 9.9999999392252902907785028219223e-09f)));
     float3 _429 = _425 * _428;
     float _430 = _426 * _428;
-    uint _433 = asuint(_23_m0[_13]._m2.x);
-    bool _438 = (asuint(_23_m0[_13]._m1.w) & 16u) != 0u;
+    uint _433 = asuint(EID4780_PSInstance(_13)._m2.x);
+    bool _438 = (asuint(EID4780_PSInstance(_13)._m1.w) & 16u) != 0u;
     float4 _451;
     float4 _452;
     if (_438)
@@ -408,8 +498,8 @@ void frag_main()
     }
     else
     {
-        _451 = _23_m0[_13]._m0[2];
-        _452 = _23_m0[_13]._m0[0];
+        _451 = EID4780_PSInstance(_13)._m0[2];
+        _452 = EID4780_PSInstance(_13)._m0[0];
     }
     float4 _458 = _55.SampleBias(eid4780_linear_repeat_sampler27, _3, _20_m16);
     float3 _463 = _458.xyz * _50_m24.xyz;
@@ -435,13 +525,13 @@ void frag_main()
     float2 capturedPixel = (_7.xy / max(_7.z, 1e-6f) * float2(0.5f, -0.5f) + 0.5f) * _20_m0.xy - _20_m9.xy;
     bool capturedScreenValid = _7.z > 0.0f && all(capturedPixel >= 0.0f) && all(capturedPixel < _20_m0.xy);
     float3 _541 = mul(float3x3(_18_m1[0].xyz, _18_m1[1].xyz, _18_m1[2].xyz), float3(0.0f, 0.0f, 1.0f));
-    uint _550 = asuint((_20_m89.x > 0.5f) ? _20_m89.y : _23_m0[_13]._m7.x);
+    uint _550 = asuint((_20_m89.x > 0.5f) ? _20_m89.y : EID4780_PSInstance(_13)._m7.x);
     float4 _563 = float4(float(_550 & 255u), float((_550 >> 8u) & 255u), float((_550 >> 16u) & 255u), float((_550 >> 24u) & 255u)) * 0.0039215688593685626983642578125f.xxxx;
     float _564 = _563.x;
     float _566 = _563.z;
     float _567 = _563.w;
     float _573 = _508.y;
-    float _576 = smoothstep(-0.20000000298023223876953125f, 0.1500000059604644775390625f, lerp(_23_m0[_13]._m7.y, _20_m89.w, _20_m89.x) - _573) * _563.y;
+    float _576 = smoothstep(-0.20000000298023223876953125f, 0.1500000059604644775390625f, lerp(EID4780_PSInstance(_13)._m7.y, _20_m89.w, _20_m89.x) - _573) * _563.y;
     float _577 = isnan(_576) ? _566 : (isnan(_566) ? _576 : max(_566, _576));
     float _585 = lerp(_20_m22.x, 1.0f, _20_m91.w) * _20_m20.x;
     float _587 = _529.z;
@@ -1177,10 +1267,10 @@ void frag_main()
                 float3 _2575 = abs(mul(float4(_508 - _37_m6[_2493].xyz, 1.0f), float4x4(float4(spvUnpackHalf2x16(_2521).x, spvUnpackHalf2x16(_2535).x, spvUnpackHalf2x16(_2549).x, 0.0f), float4(spvUnpackHalf2x16(_2521 >> 16u).x, spvUnpackHalf2x16(_2535 >> 16u).x, spvUnpackHalf2x16(_2549 >> 16u).x, 0.0f), float4(spvUnpackHalf2x16(_2528).x, spvUnpackHalf2x16(_2542).x, spvUnpackHalf2x16(_2556).x, 0.0f), float4(spvUnpackHalf2x16(_2528 >> 16u).x, spvUnpackHalf2x16(_2542 >> 16u).x, spvUnpackHalf2x16(_2556 >> 16u).x, 0.0f))).xyz);
                 float _2576 = _2575.x;
                 float _2577 = _2575.y;
-                float _2578 = isnan(_2577) ? _2576 : (isnan(_2576) ? _2577 : max(_2576, _2577));
+                float _2578 = EID4780_IsNaN(_2577) ? _2576 : (EID4780_IsNaN(_2576) ? _2577 : max(_2576, _2577));
                 float _2579 = _2575.z;
                 float _2582 = _37_m6[_2511].x * 0.5f;
-                float _2588 = 1.0f - clamp(((isnan(_2579) ? _2578 : (isnan(_2578) ? _2579 : max(_2578, _2579))) - (_2582 + 0.5f)) / (0.5f - _2582), 0.0f, 1.0f);
+                float _2588 = 1.0f - clamp(((EID4780_IsNaN(_2579) ? _2578 : (EID4780_IsNaN(_2578) ? _2579 : max(_2578, _2579))) - (_2582 + 0.5f)) / (0.5f - _2582), 0.0f, 1.0f);
                 _2590 = _2588 * _2588;
             }
             else
@@ -1211,10 +1301,10 @@ void frag_main()
                     float _2629 = (0.5f + (0.5f * _37_m6[_2496].y)) - abs(_37_m6[_2496].x);
                     float _2630 = _37_m6[_2496].y - _2629;
                     float _2634 = (1.0f - abs(_2629)) - abs(_2630);
-                    float _2637 = abs(isnan(0.00048828125f) ? _2634 : (isnan(_2634) ? 0.00048828125f : max(_2634, 0.00048828125f)));
+                    float _2637 = abs(EID4780_IsNaN(0.00048828125f) ? _2634 : (EID4780_IsNaN(_2634) ? 0.00048828125f : max(_2634, 0.00048828125f)));
                     float3 _2641 = normalize(float3(_2629, _2630, (_37_m6[_2496].x >= 0.0f) ? _2637 : (-_2637)));
                     float _2644 = 2.0f * _37_m6[_2502].y;
-                    float _2647 = lerp(_37_m6[_2508].w, isnan(0.100000001490116119384765625f) ? _2644 : (isnan(_2644) ? 0.100000001490116119384765625f : max(_2644, 0.100000001490116119384765625f)), float(_2620));
+                    float _2647 = lerp(_37_m6[_2508].w, EID4780_IsNaN(0.100000001490116119384765625f) ? _2644 : (EID4780_IsNaN(_2644) ? 0.100000001490116119384765625f : max(_2644, 0.100000001490116119384765625f)), float(_2620));
                     float3 _2652 = _37_m6[_2493].xyz - _508;
                     float3 _2653 = -_2641;
                     float3 _2658 = lerp(_2652, _2653 * dot(_2652, _2653), (float(_2620 && (_37_m6[_2502].z > 0.5f)) * _2621).xxx);
@@ -1344,7 +1434,7 @@ void frag_main()
                                 {
                                     float3 _2913 = _508 - _37_m6[_2493].xyz;
                                     float _2914 = dot(_2913, _2913);
-                                    float4 _2933 = mul(_39_m10[_2908], float4((_508 - ((_2913 * rsqrt(isnan(_2914) ? 1.1754943508222875079687365372222e-38f : (isnan(1.1754943508222875079687365372222e-38f) ? _2914 : max(1.1754943508222875079687365372222e-38f, _2914)))) * _39_m11[_2908].x)) + (_529 * (_39_m11[_2908].y * 5.0f)), 1.0f));
+                                    float4 _2933 = mul(_39_m10[_2908], float4((_508 - ((_2913 * rsqrt(EID4780_IsNaN(_2914) ? 1.1754943508222875079687365372222e-38f : (EID4780_IsNaN(1.1754943508222875079687365372222e-38f) ? _2914 : max(1.1754943508222875079687365372222e-38f, _2914)))) * _39_m11[_2908].x)) + (_529 * (_39_m11[_2908].y * 5.0f)), 1.0f));
                                     float _2934 = _2933.w;
                                     float3 _2937 = _2933.xyz / _2934.xxx;
                                     float2 _2938 = _2937.xy;
@@ -1359,16 +1449,16 @@ void frag_main()
                                     float _2967 = _2966 + 0.5f;
                                     float _2968 = _2967 * _2967;
                                     float _2971 = 1.0f - _2966;
-                                    float _2972 = isnan(0.0f) ? _2966 : (isnan(_2966) ? 0.0f : min(_2966, 0.0f));
+                                    float _2972 = EID4780_IsNaN(0.0f) ? _2966 : (EID4780_IsNaN(_2966) ? 0.0f : min(_2966, 0.0f));
                                     float _2975 = _2966 + 1.0f;
-                                    float _2976 = isnan(0.0f) ? _2966 : (isnan(_2966) ? 0.0f : max(_2966, 0.0f));
+                                    float _2976 = EID4780_IsNaN(0.0f) ? _2966 : (EID4780_IsNaN(_2966) ? 0.0f : max(_2966, 0.0f));
                                     float _2987 = _2965.y;
                                     float _2988 = _2987 + 0.5f;
                                     float _2989 = _2988 * _2988;
                                     float _2992 = 1.0f - _2987;
-                                    float _2993 = isnan(0.0f) ? _2987 : (isnan(_2987) ? 0.0f : min(_2987, 0.0f));
+                                    float _2993 = EID4780_IsNaN(0.0f) ? _2987 : (EID4780_IsNaN(_2987) ? 0.0f : min(_2987, 0.0f));
                                     float _2996 = _2987 + 1.0f;
-                                    float _2997 = isnan(0.0f) ? _2987 : (isnan(_2987) ? 0.0f : max(_2987, 0.0f));
+                                    float _2997 = EID4780_IsNaN(0.0f) ? _2987 : (EID4780_IsNaN(_2987) ? 0.0f : max(_2987, 0.0f));
                                     float3 _3009 = float3(0.1599999964237213134765625f * _2971, 0.1599999964237213134765625f * ((_2975 - (_2976 * _2976)) + 1.0f), _2968 * 0.07999999821186065673828125f);
                                     float3 _3010 = float3(0.1599999964237213134765625f * ((_2968 * 0.5f) - _2966), 0.1599999964237213134765625f * ((_2971 - (_2972 * _2972)) + 1.0f), 0.1599999964237213134765625f * _2975) + _3009;
                                     float3 _3012 = float3(0.1599999964237213134765625f * _2992, 0.1599999964237213134765625f * ((_2996 - (_2997 * _2997)) + 1.0f), _2989 * 0.07999999821186065673828125f);
@@ -1389,17 +1479,17 @@ void frag_main()
                                     float _3055 = _3013.y;
                                     float _3059 = _3013.z;
                                     float2 _3137 = 1.0f.xx - _2938;
-                                    bool2 _4031 = isnan(_2938);
-                                    bool2 _4032 = isnan(_3137);
+                                    bool2 _4031 = EID4780_IsNaN(_2938);
+                                    bool2 _4032 = EID4780_IsNaN(_3137);
                                     float2 _4033 = min(_2938, _3137);
                                     float2 _4034 = float2(_4031.x ? _3137.x : _4033.x, _4031.y ? _3137.y : _4033.y);
                                     float2 _3138 = float2(_4032.x ? _2938.x : _4034.x, _4032.y ? _2938.y : _4034.y);
                                     float _3139 = _3138.x;
                                     float _3140 = _3138.y;
-                                    float _3141 = isnan(_3140) ? _3139 : (isnan(_3139) ? _3140 : min(_3139, _3140));
+                                    float _3141 = EID4780_IsNaN(_3140) ? _3139 : (EID4780_IsNaN(_3139) ? _3140 : min(_3139, _3140));
                                     float _3145 = (_39_m11[_2908].z - _2934) * 0.25f;
-                                    float _3147 = smoothstep(0.0f, 0.0500000007450580596923828125f, isnan(_3141) ? _3145 : (isnan(_3145) ? _3141 : min(_3145, _3141)));
-                                    _3155 = _2909 ? lerp(1.0f, (any(bool3(_2947.x || _2948.x, _2947.y || _2948.y, _2947.z || _2948.z)) || ((asuint(_2951) & 2147483647u) > 2139095040u)) ? 1.0f : ((((((((((_3048 * _3049) * _40.SampleCmpLevelZero(eid4780_linear_clamp_compare_sampler28, float3(_3023 + float2(_3024, _3025), _387).xy, _2951)) + ((_3051 * _3049) * _40.SampleCmpLevelZero(eid4780_linear_clamp_compare_sampler28, float3(_3023 + float2(_3028, _3025), _387).xy, _2951))) + ((_3053 * _3049) * _40.SampleCmpLevelZero(eid4780_linear_clamp_compare_sampler28, float3(_3023 + float2(_3031, _3025), _387).xy, _2951))) + ((_3048 * _3055) * _40.SampleCmpLevelZero(eid4780_linear_clamp_compare_sampler28, float3(_3023 + float2(_3024, _3034), _387).xy, _2951))) + ((_3051 * _3055) * _40.SampleCmpLevelZero(eid4780_linear_clamp_compare_sampler28, float3(_3023 + float2(_3028, _3034), _387).xy, _2951))) + ((_3053 * _3055) * _40.SampleCmpLevelZero(eid4780_linear_clamp_compare_sampler28, float3(_3023 + float2(_3031, _3034), _387).xy, _2951))) + ((_3048 * _3059) * _40.SampleCmpLevelZero(eid4780_linear_clamp_compare_sampler28, float3(_3023 + float2(_3024, _3041), _387).xy, _2951))) + ((_3051 * _3059) * _40.SampleCmpLevelZero(eid4780_linear_clamp_compare_sampler28, float3(_3023 + float2(_3028, _3041), _387).xy, _2951))) + ((_3053 * _3059) * _40.SampleCmpLevelZero(eid4780_linear_clamp_compare_sampler28, float3(_3023 + float2(_3031, _3041), _387).xy, _2951))), _2859 ? (isnan(_3147) ? _39_m11[_2908].w : (isnan(_39_m11[_2908].w) ? _3147 : min(_39_m11[_2908].w, _3147))) : _39_m11[_2908].w) : 1.0f;
+                                    float _3147 = smoothstep(0.0f, 0.0500000007450580596923828125f, EID4780_IsNaN(_3141) ? _3145 : (EID4780_IsNaN(_3145) ? _3141 : min(_3145, _3141)));
+                                    _3155 = _2909 ? lerp(1.0f, (any(bool3(_2947.x || _2948.x, _2947.y || _2948.y, _2947.z || _2948.z)) || ((asuint(_2951) & 2147483647u) > 2139095040u)) ? 1.0f : ((((((((((_3048 * _3049) * _40.SampleCmpLevelZero(eid4780_linear_clamp_compare_sampler28, float3(_3023 + float2(_3024, _3025), _387).xy, _2951)) + ((_3051 * _3049) * _40.SampleCmpLevelZero(eid4780_linear_clamp_compare_sampler28, float3(_3023 + float2(_3028, _3025), _387).xy, _2951))) + ((_3053 * _3049) * _40.SampleCmpLevelZero(eid4780_linear_clamp_compare_sampler28, float3(_3023 + float2(_3031, _3025), _387).xy, _2951))) + ((_3048 * _3055) * _40.SampleCmpLevelZero(eid4780_linear_clamp_compare_sampler28, float3(_3023 + float2(_3024, _3034), _387).xy, _2951))) + ((_3051 * _3055) * _40.SampleCmpLevelZero(eid4780_linear_clamp_compare_sampler28, float3(_3023 + float2(_3028, _3034), _387).xy, _2951))) + ((_3053 * _3055) * _40.SampleCmpLevelZero(eid4780_linear_clamp_compare_sampler28, float3(_3023 + float2(_3031, _3034), _387).xy, _2951))) + ((_3048 * _3059) * _40.SampleCmpLevelZero(eid4780_linear_clamp_compare_sampler28, float3(_3023 + float2(_3024, _3041), _387).xy, _2951))) + ((_3051 * _3059) * _40.SampleCmpLevelZero(eid4780_linear_clamp_compare_sampler28, float3(_3023 + float2(_3028, _3041), _387).xy, _2951))) + ((_3053 * _3059) * _40.SampleCmpLevelZero(eid4780_linear_clamp_compare_sampler28, float3(_3023 + float2(_3031, _3041), _387).xy, _2951))), _2859 ? (EID4780_IsNaN(_3147) ? _39_m11[_2908].w : (EID4780_IsNaN(_39_m11[_2908].w) ? _3147 : min(_39_m11[_2908].w, _3147))) : _39_m11[_2908].w) : 1.0f;
                                 }
                                 else
                                 {
@@ -1425,11 +1515,11 @@ void frag_main()
                                 float _3163 = _3162.x;
                                 float _3164 = _3162.y;
                                 float _3165 = _3162.z;
-                                float _3166 = isnan(_3164) ? _3163 : (isnan(_3163) ? _3164 : max(_3163, _3164));
-                                float _3168 = (isnan(_3165) ? _3166 : (isnan(_3166) ? _3165 : max(_3166, _3165))) * lerp(0.75f, 0.5f, _2399);
+                                float _3166 = EID4780_IsNaN(_3164) ? _3163 : (EID4780_IsNaN(_3163) ? _3164 : max(_3163, _3164));
+                                float _3168 = (EID4780_IsNaN(_3165) ? _3166 : (EID4780_IsNaN(_3166) ? _3165 : max(_3166, _3165))) * lerp(0.75f, 0.5f, _2399);
                                 float3 _3175 = _2239.xyz;
                                 _3236 = _2832;
-                                _3237 = (_37_m6[_2490].xyz * ((1.0f - _37_m6[_2502].y) + ((1.0f / (isnan(_3168) ? 1.0f : (isnan(1.0f) ? _3168 : max(1.0f, _3168)))) * _37_m6[_2502].y))) * lerp(0.5f * _37_m6[_2502].x, 1.0f, clamp(_2852 + 0.5f, 0.0f, 1.0f));
+                                _3237 = (_37_m6[_2490].xyz * ((1.0f - _37_m6[_2502].y) + ((1.0f / (EID4780_IsNaN(_3168) ? 1.0f : (EID4780_IsNaN(1.0f) ? _3168 : max(1.0f, _3168)))) * _37_m6[_2502].y))) * lerp(0.5f * _37_m6[_2502].x, 1.0f, clamp(_2852 + 0.5f, 0.0f, 1.0f));
                                 _3238 = _2853;
                                 _3239 = _3175;
                                 _3240 = _3175;

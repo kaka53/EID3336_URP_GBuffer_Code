@@ -35,10 +35,16 @@ public sealed class EID5618ComputePass3Feature : ScriptableRendererFeature
 
     public Settings settings = new Settings();
     Pass pass;
+    Settings passSettings;
 
     public override void Create()
     {
-        pass = new Pass(settings);
+        if (pass == null || !ReferenceEquals(passSettings, settings))
+        {
+            pass?.Dispose();
+            pass = new Pass(settings);
+            passSettings = settings;
+        }
         pass.renderPassEvent = settings.injectionPoint;
     }
 
@@ -46,6 +52,7 @@ public sealed class EID5618ComputePass3Feature : ScriptableRendererFeature
     {
         pass?.Dispose();
         pass = null;
+        passSettings = null;
     }
 
     public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
@@ -108,7 +115,6 @@ public sealed class EID5618ComputePass3Feature : ScriptableRendererFeature
         public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
         {
             cameraColor = renderingData.cameraData.renderer.cameraColorTargetHandle;
-            Allocate(ref skySrc, 1366, 768, "EID5542_Src");
             Allocate(ref half659, 683, 384, "EID5542_209659");
             for (int i0 = 0; i0 < 7; i0++)
                 Allocate(ref down[i0], DownWidth[i0], DownHeight[i0], "EID" + (5546 + i0 * 4) + "_down");
@@ -137,7 +143,7 @@ public sealed class EID5618ComputePass3Feature : ScriptableRendererFeature
             {
                 using (new ProfilingScope(cmd, sampler))
                 {
-                    Texture hdr = ResolveSkySrc(cmd);
+                    Texture hdr = ResolveSkySrc(cmd, renderingData.cameraData.camera);
                     if (hdr == null)
                     {
                         WarnOnce("[EID5618 CP3] Missing EID4922 camera color for EID5542 _Src.");
@@ -202,8 +208,11 @@ public sealed class EID5618ComputePass3Feature : ScriptableRendererFeature
             }
         }
 
-        Texture ResolveSkySrc(CommandBuffer cmd)
+        Texture ResolveSkySrc(CommandBuffer cmd, Camera camera)
         {
+            RenderTexture taa = EID5537FixedFrameRendererFeature.GetCurrentOutput(camera);
+            if (taa != null) return taa;
+            Allocate(ref skySrc, 1366, 768, "EID5542_Src");
             if (skySrc == null || skySrc.rt == null)
                 return null;
             if (cameraColor != null && cameraColor.rt != null)
@@ -222,6 +231,10 @@ public sealed class EID5618ComputePass3Feature : ScriptableRendererFeature
 
         static void Allocate(ref RTHandle handle, int width, int height, string name)
         {
+            var existing = handle?.rt;
+            if (existing != null && existing.IsCreated() && existing.width == width && existing.height == height &&
+                existing.graphicsFormat == GraphicsFormat.R16G16B16A16_SFloat && existing.enableRandomWrite &&
+                existing.antiAliasing == 1) return;
             RenderTextureDescriptor desc = new RenderTextureDescriptor(width, height)
             {
                 depthBufferBits = 0,

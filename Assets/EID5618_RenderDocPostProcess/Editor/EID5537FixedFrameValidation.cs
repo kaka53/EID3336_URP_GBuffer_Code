@@ -78,8 +78,13 @@ public static class EID5537FixedFrameValidation
         foreach (var entry in rendererAsset.rendererFeatures)
             if (entry is EID5537FixedFrameRendererFeature found) { feature = found; break; }
         if (feature == null) throw new InvalidOperationException("EID5537 feature not installed.");
+        bool previousLiveInputs = feature.settings.useLiveInputs;
+        bool previousColorHistory = feature.settings.useLiveColorHistory;
+        bool previousLiveDepth = feature.settings.useLiveGBufferDepth;
         int previousProbe = feature.settings.probeInput;
+        bool previousAllowEditMode = feature.settings.allowEditMode;
         feature.settings.probeInput = probe;
+        feature.settings.allowEditMode = true;
         var pipelineAsset = AssetDatabase.LoadAssetAtPath<UniversalRenderPipelineAsset>(
             "Assets/EID3332_EID3336_Combined/Settings/EID3332Combined-URP.asset");
         if (pipelineAsset == null) throw new InvalidOperationException("Combined URP pipeline not found.");
@@ -90,17 +95,20 @@ public static class EID5537FixedFrameValidation
         RenderTexture cameraTarget = null;
         try
         {
+            feature.settings.useLiveInputs = false;
+            feature.settings.useLiveColorHistory = false;
+            feature.settings.useLiveGBufferDepth = false;
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             GraphicsSettings.defaultRenderPipeline = pipelineAsset;
             QualitySettings.renderPipeline = pipelineAsset;
-            cameraObject = new GameObject("EID5537 Fixed Frame Validation Camera");
+            cameraObject = new GameObject("EID3336 RenderDoc Camera");
             var camera = cameraObject.AddComponent<Camera>();
             camera.clearFlags = CameraClearFlags.SolidColor;
             cameraTarget = new RenderTexture(EID5537FixedFrameRendererFeature.Width,
                 EID5537FixedFrameRendererFeature.Height, 0, RenderTextureFormat.ARGBHalf);
             camera.targetTexture = cameraTarget;
             camera.Render();
-            var target = EID5537FixedFrameRendererFeature.CurrentOutput;
+            var target = EID5537FixedFrameRendererFeature.GetCurrentOutput(camera);
             if (target == null || target.width != EID5537FixedFrameRendererFeature.Width ||
                 target.height != EID5537FixedFrameRendererFeature.Height)
                 throw new InvalidOperationException("EID5537 RenderFeature did not produce the 1366x768 RT.");
@@ -112,7 +120,11 @@ public static class EID5537FixedFrameValidation
         }
         finally
         {
+            feature.settings.useLiveInputs = previousLiveInputs;
+            feature.settings.useLiveColorHistory = previousColorHistory;
+            feature.settings.useLiveGBufferDepth = previousLiveDepth;
             feature.settings.probeInput = previousProbe;
+            feature.settings.allowEditMode = previousAllowEditMode;
             GraphicsSettings.defaultRenderPipeline = previousGraphics;
             QualitySettings.renderPipeline = previousQuality;
             if (cameraObject != null) UnityEngine.Object.DestroyImmediate(cameraObject);
